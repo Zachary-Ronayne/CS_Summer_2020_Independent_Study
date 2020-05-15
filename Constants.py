@@ -1,0 +1,11 @@
+MOVE = 0
+GOOD = 1
+BAD = 2
+DEAD = 3
+WIN = 4
+
+UP = 0
+RIGHT = 1
+DOWN = 2
+LEFT = 3
+CANT_MOVE = 4
