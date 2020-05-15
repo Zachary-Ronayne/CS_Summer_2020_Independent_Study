@@ -26,21 +26,38 @@ class Table:
         self.learnRate = learnRate
         self.discountRate = discountRate
 
-        self.qTable = np.zeros((states, actions))
+        self.qTable = None
+        self.reset()
 
         self.currentState = 0
         self.currentAction = 0
 
         self.model = model
 
-    def updateTable(self, s, a):
+    def reset(self):
+        """
+        Reset the QTable to all zeros
+        """
+        self.qTable = np.zeros((self.states, self.actions))
+
+    def updateTable(self, oldS, oldA, s, a):
         """
         Go from the current state to the next state
+        :param oldS: the old state
+        :param oldA: the old action
         :param s: The next state to go to
         :param a: The action taken
         """
-        self.qTable[s, a] = self.qTable[s, a] + self.learnRate * (
-                self.rewardFunc(s, a) + self.discountRate * (self.model.maxState(s, a) - self.qTable[s, a]))
+
+        if SIMPLE_BELLMAN:
+            # simplified bellman function
+            self.qTable[oldS, oldA] = self.learnRate * (self.rewardFunc(oldS, oldA) + self.model.maxState(s, a))
+        else:
+            # complex bellman function
+            self.qTable[oldS, oldA] = self.qTable[oldS, oldA] + self.learnRate * (
+                    self.rewardFunc(oldS, oldA)
+                    + self.discountRate * (self.model.maxState(s, a)) - self.qTable[oldS, oldA]
+            )
 
 
 class DummyModel:
@@ -48,17 +65,17 @@ class DummyModel:
     def __init__(self, grid, rewards=None, pos=(0, 0), explorationRate=0.5):
         """
         Create a dummy model for Q learning. This is a grid where moving to a new square gives different reward.
-            Moving from one square to another is -1 reward
+            Moving from one square to another is reduces reward
         :param grid: A 2D numpy array containing the values for entering the corresponding square.
         :param rewards: A list of the rewards for a corresponding action, none for default values,
-            default [-1, 1, -3, -10, 10], [move, good, bad, dead, win]
+            [move, good, bad, dead, win, do nothing]
         :param pos: A 2-tuple, (x, y), the starting position in the grid, default: (0, 0)
         """
         self.grid = grid
 
         self.rewards = rewards
         if self.rewards is None:
-            self.rewards = [-1, 1, -3, -10, 10]
+            self.rewards = [D_MOVE, D_GOOD, D_BAD, D_DEAD, D_WIN, D_DO_NOTHING]
 
         self.defaultPos = pos
         self.x, self.y = pos
@@ -75,6 +92,15 @@ class DummyModel:
         y = s // len(self.grid[0])
         return x, y
 
+    def state(self, x, y):
+        """
+        Convert grid coordinates to their corresponding state
+        :param x: The x coordinate
+        :param y: The y coordinate
+        :return: The state
+        """
+        return x + y * len(self.grid)
+
     def maxState(self, s, a):
         """
         Get the maximum reward that can be achieved from the current state to the next
@@ -83,10 +109,10 @@ class DummyModel:
         :return: The maximum reward
         """
 
-        # TODO I think the problem is in this function
-        #   it is incorrectly calculating the next best state value
-
         x, y = self.pos(s)
+
+        # test code, seeing if changing direction based on action makes a difference
+        """
         if a == UP:
             y -= 1
         elif a == DOWN:
@@ -95,6 +121,7 @@ class DummyModel:
             x -= 1
         elif a == RIGHT:
             x += 1
+        """
 
         values = []
         if x > 0:
@@ -109,7 +136,7 @@ class DummyModel:
         if len(values) > 0:
             return max(values)
         else:
-            return self.rewards[CANT_MOVE]
+            return self.rewards[DO_NOTHING]
 
     def move(self, direction):
         """
@@ -133,9 +160,25 @@ class DummyModel:
         return self.grid[self.x, self.y]
 
     def rewardFunc(self, s, a):
+        # can't move, punish for corresponding punishment for not moving
         if a == CANT_MOVE:
-            return self.rewards[MOVE]
-        return self.rewards[self.grid[s % 4][s // 4]]
+            return self.rewards[DO_NOTHING]
+
+        # get the position
+        x, y = self.pos(s)
+
+        # determine new grid position based on action
+        if s == UP:
+            y -= 1
+        elif s == DOWN:
+            y += 1
+        elif s == LEFT:
+            x -= 1
+        elif s == RIGHT:
+            x += 1
+
+        # return the reward in the square, along with the cost of moving
+        return self.rewards[self.grid[y, x]] - MOVE_COST
 
     def playGame(self, qTable, learn=False, printPos=False):
         """
@@ -148,14 +191,18 @@ class DummyModel:
 
         # reset them model
         self.x, self.y = self.defaultPos
-        square = self.grid[self.y, self.x]
         moves = 0
         total = 0
 
+        state = self.state(self.x, self.y)
+        action = CANT_MOVE
+
         # run the model until 100 moves, or it ends the game
-        while square != WIN and square != DEAD and moves < 100:
+        while moves < MAX_MOVES:
+            oldState, oldAction = state, action
+
             # get the state
-            state = self.x + self.y * len(self.grid[0])
+            state = self.state(self.x, self.y)
 
             # pick a direction
             actions = [qTable.qTable[state, i] for i in range(4)]
@@ -179,10 +226,18 @@ class DummyModel:
 
             # update the QTable
             if learn:
-                qTable.updateTable(state, action)
+                qTable.updateTable(oldState, oldAction, state, action)
 
             # print the position
             if printPos:
                 print(str(self.x) + " " + str(self.y))
+
+            # if an ending square is reached, apply that reward
+            if square == WIN:
+                total += self.rewards[WIN]
+                break
+            elif square == DEAD:
+                total += self.rewards[DEAD]
+                break
 
         return total
