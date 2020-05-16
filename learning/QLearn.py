@@ -88,8 +88,8 @@ class DummyModel:
         :param s: The state
         :return: A 2-tuple of (x, y) of the position
         """
-        x = s % len(self.grid[0])
-        y = s // len(self.grid[0])
+        x = s % self.width()
+        y = s // self.width()
         return x, y
 
     def state(self, x, y):
@@ -99,7 +99,39 @@ class DummyModel:
         :param y: The y coordinate
         :return: The state
         """
-        return x + y * len(self.grid[0])
+        return x + y * self.width()
+
+    def width(self):
+        """
+        Get the width of the grid
+        :return: The width
+        """
+        return len(self.grid[0])
+
+    def height(self):
+        """
+        Get the height of the grid
+        :return: The height
+        """
+        return len(self.grid)
+
+    def gridP(self, x, y):
+        """
+        Get the grid value at the given position
+        :param x: The x position
+        :param y: The y position
+        :return: The grid value
+        """
+        return self.grid[y, x]
+
+    def setGrid(self, x, y, a):
+        """
+        Set the given grid position to the given value
+        :param x: The x position
+        :param y: The y position
+        :param a: The given value
+        """
+        self.grid[y, x] = a
 
     def move(self, direction):
         """
@@ -111,16 +143,16 @@ class DummyModel:
 
         if direction == LEFT and self.x > 0:
             self.x -= 1
-        if direction == RIGHT and self.x < len(self.grid[0]) - 1:
+        if direction == RIGHT and self.x < self.width() - 1:
             self.x += 1
         if direction == UP and self.y > 0:
             self.y -= 1
-        if direction == DOWN and self.y < len(self.grid) - 1:
+        if direction == DOWN and self.y < self.height() - 1:
             self.y += 1
 
         if oldX == self.x and oldY == self.y:
             return None
-        return self.grid[self.y, self.x]
+        return self.gridP(self.x, self.y)
 
     def rewardFunc(self, s, a):
         """
@@ -147,11 +179,11 @@ class DummyModel:
             x += 1
 
         # if the action moved outside the grid, return the reward for do nothing
-        if x < 0 or x > len(self.grid[0]) - 1 or y < 0 or y > len(self.grid) - 1:
+        if x < 0 or x > self.width() - 1 or y < 0 or y > self.height() - 1:
             return self.rewards[DO_NOTHING]
 
         # return the reward in the square, along with the cost of moving
-        return self.rewards[self.grid[y, x]] - MOVE_COST
+        return self.rewards[self.gridP(x, y)] - MOVE_COST
 
     def playGame(self, qTable, learn=False, printPos=False):
         """
@@ -167,7 +199,7 @@ class DummyModel:
         moves = 0
         total = 0
 
-        square = self.grid[self.x, self.y]
+        square = self.gridP(self.x, self.y)
 
         # run the model until 100 moves, or it ends the game
         while not square == WIN and not square == DEAD and moves < MAX_MOVES:
@@ -210,7 +242,7 @@ class DummyModel:
                 print("(x: " + str(self.x) + ", y: " + str(self.y) + ")")
 
             # determine the value of the current grid square and account for making a move
-            square = self.grid[self.y, self.x]
+            square = self.gridP(self.x, self.y)
             moves += 1
 
         return total
