@@ -89,7 +89,7 @@ class DummyModel:
         :return: A 2-tuple of (x, y) of the position
         """
         x = s % len(self.grid[0])
-        y = s // len(self.grid)
+        y = s // len(self.grid[0])
         return x, y
 
     def state(self, x, y):
@@ -99,7 +99,7 @@ class DummyModel:
         :param y: The y coordinate
         :return: The state
         """
-        return x + y * len(self.grid)
+        return x + y * len(self.grid[0])
 
     def move(self, direction):
         """

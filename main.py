@@ -28,18 +28,18 @@ from Constants import *
 
 
 # create a grid
-gridW, gridH = 4, 4
+gridW, gridH = 4, 6
 grid = np.zeros((gridH, gridW), dtype=np.int32)
-grid[3, 3] = WIN
-grid[2, 2] = DEAD
+grid[5, 3] = WIN
+grid[3, 3] = DEAD
 
-grid[1, 0] = MOVE
-grid[2, 0] = MOVE
+grid[1, 0] = BAD
+grid[2, 0] = GOOD
 grid[3, 0] = GOOD
 grid[3, 1] = GOOD
 grid[3, 2] = GOOD
 
-grid[0, 1] = MOVE
+grid[0, 1] = GOOD
 grid[0, 2] = GOOD
 grid[0, 3] = GOOD
 grid[1, 3] = GOOD
@@ -52,7 +52,7 @@ qTable = Table(gridW * gridH, 5, model.rewardFunc, model, learnRate=0.5, discoun
 
 # train model
 model.explorationRate = 0.9
-for i in range(100):
+for i in range(1000):
     total = model.playGame(qTable, learn=True)
 
 # run the model
