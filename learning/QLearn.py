@@ -1,38 +1,95 @@
 import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+import tensorflow.python as tfp
 
 import random
+import abc
 
 from Constants import *
 
 
-class Table:
+class QModel:
+    """
+    A generic object for creating a QModel. Should be treated as an abstract object, and not used on its own
+    """
 
-    def __init__(self, states, actions, rewardFunc, model, learnRate=0.5, discountRate=0.5):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, states, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
-        Create a Q table that will keep track of all of the Q values for actions and states
+        Create a QModel with the given parameters
         :param states: The number of states
-        :param actions: The number of actions
-        :param model: The model to use with this table for determining when actions can happen, and potential reward
-        :param rewardFunc: A function with two numerical parameters determining the reinforcement
-            value for the given state and action. First parameter is state, second parameter is action
+        :param actions: The number of actions, None if this model does not use states
+        :param environment: The environment to use with this table for determining when actions can happen, and potential reward
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
         """
         self.states = states
         self.actions = actions
 
-        self.rewardFunc = rewardFunc
+        self.environment = environment
 
         self.learnRate = learnRate
         self.discountRate = discountRate
+        self.explorationRate = explorationRate
+
+    def chooseAction(self, state):
+        """
+        Choose an action to take, based on the current state.
+            Can randomly be either the highest valued action, or a random action, depending on explorationRate
+        :param state: The current state of the model
+        :return: The action to take
+        """
+        # get a list of all the rewards for each action in the current state
+        actions = self.getActions(state)
+
+        # randomly choose to either pick the index of the action with the highest value,
+        #   or a random new action, thus selecting the direction
+        if random.random() > self.explorationRate:
+            action = actions.index(max(actions))
+        else:
+            action = random.randint(0, self.actions)
+
+        return action
+
+    @abc.abstractmethod
+    def getActions(self, s):
+        """
+        Get a list of all the q values for each action, based on the current state,
+            in appropriate order based on action indexes
+        :param s: The current state
+        :return: The list of q values
+        """
+        return []
+
+    @abc.abstractmethod
+    def train(self, oldS, oldA, s, a):
+        """
+        Modify the QModel to change based on the given states and actions
+        :param oldS: the old state
+        :param oldA: the old action
+        :param s: The next state to go to
+        :param a: The action taken
+        """
+        pass
+
+
+class Table(QModel):
+
+    def __init__(self, states, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+        """
+        Create a Q table that will keep track of all of the Q values for actions and states
+        :param states: The number of states
+        :param actions: The number of actions
+        :param environment: The model to use with this table for determining when actions can happen, and potential reward
+        :param learnRate: The learning rate of the table
+        :param discountRate: The discount rate of the table
+        """
+        super().__init__(states, actions, environment, learnRate, discountRate, explorationRate)
 
         self.qTable = None
         self.reset()
-
-        self.currentState = 0
-        self.currentAction = 0
-
-        self.model = model
 
     def reset(self):
         """
@@ -40,31 +97,112 @@ class Table:
         """
         self.qTable = np.zeros((self.states, self.actions))
 
-    def updateTable(self, oldS, oldA, s, a):
-        """
-        Go from the current state to the next state
-        :param oldS: the old state
-        :param oldA: the old action
-        :param s: The next state to go to
-        :param a: The action taken
-        """
-
+    def train(self, oldS, oldA, s, a):
         if SIMPLE_BELLMAN:
             # simplified bellman function
-            self.qTable[oldS, oldA] = self.learnRate * (self.rewardFunc(oldS, oldA) + self.model.maxState(s, a))
+            self.qTable[oldS, oldA] = self.learnRate * (self.environment.rewardFunc(oldS, oldA) + self.environment.maxState(s, a))
         else:
             # complex bellman function
             self.qTable[oldS, oldA] = self.qTable[oldS, oldA] + self.learnRate * (
-                    self.rewardFunc(oldS, oldA) - self.qTable[oldS, oldA] +
+                    self.environment.rewardFunc(oldS, oldA) - self.qTable[oldS, oldA] +
                     self.discountRate * (max(self.qTable[s]))
             )
 
+    def getActions(self, s):
+        return [self.qTable[s, i] for i in range(4)]
 
-class DummyModel:
+
+class Network(QModel):
+
+    def __init__(self, states, actions, environment, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+        """
+        Create a Network for Q learning for training a model
+        :param states: The number of states
+        :param actions: The number of actions
+        :param environment: The model to use with this table for determining when actions can happen, and potential reward
+        :param inner: The inner layers of the Network, None to have no inner layers, default None.
+            Should only be positive integers
+        :param learnRate: The learning rate of the table
+        :param discountRate: The discount rate of the table
+        """
+        super().__init__(states, actions, environment, learnRate, discountRate, explorationRate)
+
+        if inner is None:
+            inner = []
+        self.inner = inner
+
+        # turn off eager mode
+        tf.compat.v1.disable_eager_execution()
+
+        # create input layer
+        layers = [keras.layers.InputLayer(input_shape=(self.environment.stateSize(),))]
+
+        # TODO all the weights and biases should initialize to zero, so that the output of everything is zero
+
+        # add all hidden layers
+        for lay in self.inner:
+            layers.append(keras.layers.Dense(lay, activation="tanh", use_bias=True))
+
+        # add output layer
+        layers.append(keras.layers.Dense(self.actions, activation="tanh"))
+
+        # put the final network together
+        self.net = keras.Sequential(layers)
+        self.net.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+    def train(self, oldS, oldA, s, a):
+        # TODO should use oldS, oldA, and a?
+
+        # get the outputs and inputs based on the current state for the current
+        inputs = self.getInputs()
+        outputs = self.getOutputValues()
+
+        # add the appropriate reward values to the expected output
+        # TODO is this an effective training strategy? Probably not
+        add = np.zeros((self.actions,))
+        for i in range(self.actions):
+            add[i] = self.environment.rewardFunc(s, i)
+        outputs += add
+
+        # TODO should use evaluate rather than fit?
+        self.net.fit(inputs, outputs, batch_size=1, verbose=0, use_multiprocessing=True)
+
+    def getOutputs(self):
+        """
+        Get all the output for the model, based on it's current state
+        :return: The output values as a tensor
+        """
+        # calculate the results
+        return self.net.__call__(self.getInputs())
+
+    def getOutputValues(self):
+        """
+        Get the output values of the model as a numpy array
+        :return: The output values
+        """
+        # TODO figure out a good way to get the outputs
+        return tensorToArray(self.getOutputs())
+
+    def getInputs(self):
+        """
+        Get the inputs for the network
+        :return: The inputs as a numpy array
+        """
+        inputs = np.zeros((1, self.environment.stateSize()))
+        inputs[0] = self.environment.toState()
+        return inputs
+
+    def getActions(self, s):
+        # TODO this should use the current state somehow, or does it already?
+        actions = self.getOutputValues()
+        return [a for a in actions]
+
+
+class DummyGame:
 
     def __init__(self, grid, rewards=None, pos=(0, 0), explorationRate=0.5):
         """
-        Create a dummy model for Q learning. This is a grid where moving to a new square gives different reward.
+        Create a dummy game for Q learning. This is a grid where moving to a new square gives different reward.
             Moving from one square to another is reduces reward
         :param grid: A 2D numpy array containing the values for entering the corresponding square.
         :param rewards: A list of the rewards for a corresponding action, none for default values,
@@ -100,6 +238,13 @@ class DummyModel:
         :return: The state
         """
         return x + y * self.width()
+
+    def currentState(self):
+        """
+        Get the current state of this model
+        :return: the state
+        """
+        return self.state(self.x, self.y)
 
     def width(self):
         """
@@ -154,6 +299,35 @@ class DummyModel:
             return None
         return self.gridP(self.x, self.y)
 
+    def stateSize(self):
+        """
+        Get the number of values used for input for a network
+        :return: The number of values
+        """
+        return 5 * self.width() * self.height()
+
+    def toState(self):
+        """
+        Convert the model into a 1D numpy array that can be fed into a network as inputs
+        :return: the inputs
+        """
+        # create an array of appropriate size
+        arr = np.zeros((self.stateSize(),))
+        size = self.width() * self.height()
+
+        # there are 5 possibilities for each grid position
+        for c in range(5):
+            # go through each row
+            for i, y in enumerate(self.grid):
+                # go through each position in the row
+                for j, x in enumerate(y):
+                    # get the position in the array
+                    pos = c * size + i * self.width() + j
+                    # if the id of the grid position matches the current grid position,
+                    #   set the array to 1, 0 otherwise
+                    arr[pos] = 1 if x == c else 0
+        return arr
+
     def rewardFunc(self, s, a):
         """
         Determine the reward for the given action during the given state
@@ -185,10 +359,10 @@ class DummyModel:
         # return the reward in the square, along with the cost of moving
         return self.rewards[self.gridP(x, y)] - MOVE_COST
 
-    def playGame(self, qTable, learn=False, printPos=False):
+    def playGame(self, qModel, learn=False, printPos=False):
         """
         Play the game using the given QTable
-        :param qTable: The table to use for making decisions
+        :param qModel: The table or network to use for making decisions
         :param learn: True to also update the given qTable as this model learns, False otherwise, default False
         :param printPos: True if the position should be printed after each move, False otherwise, default False
         :return: The total reward gained from playing the game
@@ -206,19 +380,11 @@ class DummyModel:
             # get the state before making an action
             state = self.state(self.x, self.y)
 
-            # save the old state and action
+            # save the old state
             oldState = state
 
             # pick a direction
-            # make a list of all the rewards for each action in the current state
-            actions = [qTable.qTable[state, i] for i in range(4)]
-
-            # randomly choose to either pick the index of the action with the highest value,
-            #   or a random new action, thus selecting the direction
-            if random.random() > self.explorationRate:
-                direction = actions.index(max(actions))
-            else:
-                direction = random.randint(0, 3)
+            direction = qModel.chooseAction(state)
 
             # move and update game ending conditions
             # also get the direction
@@ -231,11 +397,11 @@ class DummyModel:
             state = self.state(self.x, self.y)
 
             # add to the total reward
-            total += qTable.rewardFunc(oldState, action)
+            total += self.rewardFunc(oldState, action)
 
-            # update the QTable
+            # update the QModel
             if learn:
-                qTable.updateTable(oldState, action, state, action)
+                qModel.train(oldState, action, state, action)
 
             # print the position
             if printPos:
@@ -246,3 +412,13 @@ class DummyModel:
             moves += 1
 
         return total
+
+
+def tensorToArray(ten):
+    """
+    Get the output values of a tensor
+    """
+    with tfp.Session() as sess:
+        sess.run(tfp.global_variables_initializer())
+        ten = sess.run(ten)
+    return ten

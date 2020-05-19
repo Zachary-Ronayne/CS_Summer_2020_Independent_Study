@@ -3,29 +3,21 @@
 
 TODO:
 
-Create class to store the array for the Q learning table
-    Should have options for number of actions and number of states
-
-Create a simple grid game, a class to hold it
-    AI controls a thing that can go up down left right
-    Moving means -1
-    Hitting a good square means +1
-    Hitting a bad square means -3
-    Hitting a dead square means -10 and end
-    Hitting a win square means +10 and end
-
-    Make the exploration rate based on the different rewards from each new state, not just randomly exploring or not
-        like, higher valued actions should have a higher weight,
-        that difference in weight is lowered by exploration rate
-
-Train a network on this grid game
+Train a neural network on the grid game
+    Make an abstract object for the Environment and corresponding abstract methods
+    Figure out methods with TensorFlow to make it not slow
+    Play with network settings for good performance
 
 """
 
+# hide warnings
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+# normal imports
 from learning.QLearn import *
 
 from Constants import *
-
 
 # create a grid
 gridW, gridH = 4, 6
@@ -47,20 +39,39 @@ grid[2, 3] = GOOD
 
 
 # make the model
-model = DummyModel(grid)
-qTable = Table(gridW * gridH, 5, model.rewardFunc, model, learnRate=0.5, discountRate=0.7)
+model = DummyGame(grid)
 
-# train model
-model.explorationRate = 0.9
-for i in range(1000):
-    total = model.playGame(qTable, learn=True)
+network = False
 
-# run the model
-model.explorationRate = 0
-for i in range(1):
-    total = model.playGame(qTable, learn=False, printPos=True)
-    print(str(model.x) + " " + str(model.y) + " " + str(total))
+if network:
+    # make the network
+    net = Network(None, 5, model)
 
+    # train the network
+    for i in range(4):
+        total = model.playGame(net, learn=True)
+        print("Training: " + str(i))
 
-print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
-print(qTable.qTable)
+    # run the final results of the game
+    print(model.playGame(net, learn=False, printPos=True))
+
+else:
+    # make the table
+    qTable = Table(gridW * gridH, 5, model, learnRate=0.5, discountRate=0.7)
+
+    # train model
+    qTable.explorationRate = 0.9
+    for i in range(1000):
+        total = model.playGame(qTable, learn=True)
+
+    # run the model
+    qTable.explorationRate = 0
+    for i in range(1):
+        total = model.playGame(qTable, learn=False, printPos=True)
+        print(str(model.x) + " " + str(model.y) + " " + str(total))
+    print()
+
+    # print the game grid and q table
+    print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
+    print()
+    print(qTable.qTable)
