@@ -11,7 +11,7 @@ from Constants import *
 
 class QModel:
     """
-    A generic object for creating a QModel. Should be treated as an abstract object, and not used on its own
+    A generic object for creating a QModel.
     """
 
     __metaclass__ = abc.ABCMeta
@@ -76,6 +76,9 @@ class QModel:
 
 
 class Table(QModel):
+    """
+    A Q model that learns based on a Q Table
+    """
 
     def __init__(self, states, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
@@ -113,13 +116,17 @@ class Table(QModel):
 
 
 class Network(QModel):
+    """
+    A Q learning model that learns based on a feed forward neural network
+    """
 
     def __init__(self, states, actions, environment, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
         Create a Network for Q learning for training a model
         :param states: The number of states
         :param actions: The number of actions
-        :param environment: The model to use with this table for determining when actions can happen, and potential reward
+        :param environment: The environment to use with this table for determining when actions can happen,
+            and potential reward
         :param inner: The inner layers of the Network, None to have no inner layers, default None.
             Should only be positive integers
         :param learnRate: The learning rate of the table
@@ -130,6 +137,13 @@ class Network(QModel):
         if inner is None:
             inner = []
         self.inner = inner
+        self.net = None
+        self.initNetwork()
+
+    def initNetwork(self):
+        """
+        Initialize the network to an unlearned, default state
+        """
 
         # turn off eager mode
         tf.compat.v1.disable_eager_execution()
@@ -198,7 +212,40 @@ class Network(QModel):
         return [a for a in actions]
 
 
-class DummyGame:
+class Environment:
+    """
+    A generic object for an environment.
+    """
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def stateSize(self):
+        """
+        Get the number of values used for input for a network
+        :return: The number of values
+        """
+        return 0
+
+    @abc.abstractmethod
+    def toState(self):
+        """
+        Convert the model into a 1D numpy array that can be fed into a network as inputs
+        :return: the inputs
+        """
+        return np.zeros((0,))
+
+    @abc.abstractmethod
+    def rewardFunc(self, s, a):
+        """
+        Determine the reward for the given action during the given state
+        :param s: The current state
+        :param a: The current action
+        :return: The reward
+        """
+        return 0
+
+
+class DummyGame(Environment):
 
     def __init__(self, grid, rewards=None, pos=(0, 0), explorationRate=0.5):
         """
@@ -300,17 +347,9 @@ class DummyGame:
         return self.gridP(self.x, self.y)
 
     def stateSize(self):
-        """
-        Get the number of values used for input for a network
-        :return: The number of values
-        """
         return 5 * self.width() * self.height()
 
     def toState(self):
-        """
-        Convert the model into a 1D numpy array that can be fed into a network as inputs
-        :return: the inputs
-        """
         # create an array of appropriate size
         arr = np.zeros((self.stateSize(),))
         size = self.width() * self.height()
@@ -329,12 +368,6 @@ class DummyGame:
         return arr
 
     def rewardFunc(self, s, a):
-        """
-        Determine the reward for the given action during the given state
-        :param s: The current state
-        :param a: The current action
-        :return: The reward
-        """
         # can't move, punish for corresponding punishment for not moving
         if a == CANT_MOVE:
             return self.rewards[DO_NOTHING]

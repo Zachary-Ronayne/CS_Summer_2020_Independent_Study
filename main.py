@@ -4,7 +4,6 @@
 TODO:
 
 Train a neural network on the grid game
-    Make an abstract object for the Environment and corresponding abstract methods
     Figure out methods with TensorFlow to make it not slow
     Play with network settings for good performance
 
@@ -41,7 +40,8 @@ grid[2, 3] = GOOD
 # make the model
 model = DummyGame(grid)
 
-network = False
+# use the network model, or the QTable model
+network = True
 
 if network:
     # make the network
