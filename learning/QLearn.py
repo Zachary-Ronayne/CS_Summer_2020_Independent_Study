@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-import tensorflow.python as tfp
 
 import random
 import abc
@@ -21,7 +20,8 @@ class QModel:
         Create a QModel with the given parameters
         :param states: The number of states
         :param actions: The number of actions, None if this model does not use states
-        :param environment: The environment to use with this table for determining when actions can happen, and potential reward
+        :param environment: The environment to use with this table for determining when actions can happen,
+        and potential reward
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
         """
@@ -85,7 +85,8 @@ class Table(QModel):
         Create a Q table that will keep track of all of the Q values for actions and states
         :param states: The number of states
         :param actions: The number of actions
-        :param environment: The model to use with this table for determining when actions can happen, and potential reward
+        :param environment: The model to use with this table for determining when actions can happen,
+            and potential reward
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
         """
@@ -103,7 +104,8 @@ class Table(QModel):
     def train(self, oldS, oldA, s, a):
         if SIMPLE_BELLMAN:
             # simplified bellman function
-            self.qTable[oldS, oldA] = self.learnRate * (self.environment.rewardFunc(oldS, oldA) + self.environment.maxState(s, a))
+            self.qTable[oldS, oldA] = self.learnRate * (self.environment.rewardFunc(oldS, oldA) +
+                                                        self.environment.maxState(s, a))
         else:
             # complex bellman function
             self.qTable[oldS, oldA] = self.qTable[oldS, oldA] + self.learnRate * (
@@ -145,31 +147,59 @@ class Network(QModel):
         Initialize the network to an unlearned, default state
         """
 
+        # TODO use learning rate and discount rate
+
+        # TODO fix this error message by reworking code
+        # WARNING:tensorflow:From C:\Users\zrona\.Zachary\Python Programs\CS_Summer_2020_Independent_Study
+        # \venv\lib\site-packages\tensorflow\python\ops\resource_variable_ops.py:1666:
+        # calling BaseResourceVariable.__init__ (from tensorflow.python.ops.resource_variable_ops) with
+        # constraint is deprecated and will be removed in a future version.
+        # Instructions for updating:
+        # If using Keras pass *_constraint arguments to layers.
+
         # turn off eager mode
         tf.compat.v1.disable_eager_execution()
 
         # create input layer
         layers = [keras.layers.InputLayer(input_shape=(self.environment.stateSize(),))]
 
-        # TODO all the weights and biases should initialize to zero, so that the output of everything is zero
-
         # add all hidden layers
         for lay in self.inner:
-            layers.append(keras.layers.Dense(lay, activation="tanh", use_bias=True))
+            # create the layer
+            layer = keras.layers.Dense(lay, activation="sigmoid", use_bias=True)
+            # add the layer
+            layers.append(layer)
 
-        # add output layer
-        layers.append(keras.layers.Dense(self.actions, activation="tanh"))
+        # TODO test this out with using a linear activation function, see if it can make it work
+        #   also look at the actual outputs it gives, and see what happens
+        # create the output layer
+        layer = keras.layers.Dense(self.actions, activation="sigmoid", use_bias=True)
+        # add the layer
+        layers.append(layer)
 
         # put the final network together
         self.net = keras.Sequential(layers)
-        self.net.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+
+        # TODO why are the outputs all nan?
+
+        # account for the size of the output layer
+        biases = self.inner
+        biases.append(self.actions)
+
+        # set all weights amd biases to zero
+        for bias, lay in zip(biases, layers[1:]):
+            lay.set_weights([
+                np.zeros(np.array(lay.get_weights()[0]).shape),
+                np.zeros((bias,))
+            ])
+
+        # finalize the network
+        self.net.compile(optimizer="SGD", loss="categorical_crossentropy")
 
     def train(self, oldS, oldA, s, a):
-        # TODO should use oldS, oldA, and a?
-
         # get the outputs and inputs based on the current state for the current
         inputs = self.getInputs()
-        outputs = self.getOutputValues()
+        outputs = self.getOutputs()
 
         # add the appropriate reward values to the expected output
         # TODO is this an effective training strategy? Probably not
@@ -178,37 +208,29 @@ class Network(QModel):
             add[i] = self.environment.rewardFunc(s, i)
         outputs += add
 
-        # TODO should use evaluate rather than fit?
+        # TODO does this actually train the model?
         self.net.fit(inputs, outputs, batch_size=1, verbose=0, use_multiprocessing=True)
 
     def getOutputs(self):
         """
-        Get all the output for the model, based on it's current state
-        :return: The output values as a tensor
+        Get the output values of the model
+        :return: The output values as a numpy array
         """
-        # calculate the results
-        return self.net.__call__(self.getInputs())
-
-    def getOutputValues(self):
-        """
-        Get the output values of the model as a numpy array
-        :return: The output values
-        """
-        # TODO figure out a good way to get the outputs
-        return tensorToArray(self.getOutputs())
+        return self.net.predict(self.getInputs(), verbose=0)
 
     def getInputs(self):
         """
         Get the inputs for the network
-        :return: The inputs as a numpy array
+        :return: The inputs as a numpy array to be fed into the network
         """
         inputs = np.zeros((1, self.environment.stateSize()))
         inputs[0] = self.environment.toState()
         return inputs
 
     def getActions(self, s):
-        # TODO this should use the current state somehow, or does it already?
-        actions = self.getOutputValues()
+        # get the actions
+        actions = self.getOutputs()
+        # convert the actions to a list
         return [a for a in actions]
 
 
@@ -445,13 +467,3 @@ class DummyGame(Environment):
             moves += 1
 
         return total
-
-
-def tensorToArray(ten):
-    """
-    Get the output values of a tensor
-    """
-    with tfp.Session() as sess:
-        sess.run(tfp.global_variables_initializer())
-        ten = sess.run(ten)
-    return ten

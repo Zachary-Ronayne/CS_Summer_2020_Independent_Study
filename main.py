@@ -45,15 +45,18 @@ network = True
 
 if network:
     # make the network
-    net = Network(None, 5, model)
+    net = Network(gridW * gridH, 5, model, inner=[100])
+
+    print(net.getOutputs())
 
     # train the network
-    for i in range(4):
+    for i in range(1):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i))
+    print(net.getOutputs())
 
     # run the final results of the game
-    print(model.playGame(net, learn=False, printPos=True))
+    # print(model.playGame(net, learn=False, printPos=True))
 
 else:
     # make the table
