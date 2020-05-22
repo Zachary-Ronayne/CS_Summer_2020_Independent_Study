@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 from tensorflow import keras
 
 import random
@@ -149,52 +148,35 @@ class Network(QModel):
 
         # TODO use learning rate and discount rate
 
-        # TODO fix this error message by reworking code
-        # WARNING:tensorflow:From C:\Users\zrona\.Zachary\Python Programs\CS_Summer_2020_Independent_Study
-        # \venv\lib\site-packages\tensorflow\python\ops\resource_variable_ops.py:1666:
-        # calling BaseResourceVariable.__init__ (from tensorflow.python.ops.resource_variable_ops) with
-        # constraint is deprecated and will be removed in a future version.
-        # Instructions for updating:
-        # If using Keras pass *_constraint arguments to layers.
+        # create a list of layers, initialized with the input layer as the input shape
+        layers = [keras.layers.Dense(self.inner[0], activation="tanh", use_bias=True,
+                                     input_shape=(self.environment.stateSize(),))]
 
-        # turn off eager mode
-        tf.compat.v1.disable_eager_execution()
+        # add all remaining hidden layers
+        for lay in self.inner[1:]:
+            layers.append(keras.layers.Dense(lay, activation="tanh", use_bias=True))
 
-        # create input layer
-        layers = [keras.layers.InputLayer(input_shape=(self.environment.stateSize(),))]
-
-        # add all hidden layers
-        for lay in self.inner:
-            # create the layer
-            layer = keras.layers.Dense(lay, activation="sigmoid", use_bias=True)
-            # add the layer
-            layers.append(layer)
-
-        # TODO test this out with using a linear activation function, see if it can make it work
-        #   also look at the actual outputs it gives, and see what happens
         # create the output layer
-        layer = keras.layers.Dense(self.actions, activation="sigmoid", use_bias=True)
-        # add the layer
-        layers.append(layer)
+        layers.append(keras.layers.Dense(self.actions, activation="linear", use_bias=True))
 
-        # put the final network together
+        # create the network object
         self.net = keras.Sequential(layers)
 
-        # TODO why are the outputs all nan?
-
+        # set all biases to zero, and the weights to near zero
         # account for the size of the output layer
         biases = self.inner
         biases.append(self.actions)
 
-        # set all weights amd biases to zero
-        for bias, lay in zip(biases, layers[1:]):
+        # set the values
+        for bias, lay in zip(biases, layers):
             lay.set_weights([
                 np.zeros(np.array(lay.get_weights()[0]).shape),
-                np.zeros((bias,))
+                np.full((bias,), 0.1)
             ])
 
-        # finalize the network
-        self.net.compile(optimizer="SGD", loss="categorical_crossentropy")
+        # compile and finish building network
+        # TODO should Adam be used here?
+        self.net.compile(optimizer=keras.optimizers.Adam(learning_rate=self.learnRate), loss="categorical_crossentropy")
 
     def train(self, oldS, oldA, s, a):
         # get the outputs and inputs based on the current state for the current
@@ -208,8 +190,7 @@ class Network(QModel):
             add[i] = self.environment.rewardFunc(s, i)
         outputs += add
 
-        # TODO does this actually train the model?
-        self.net.fit(inputs, outputs, batch_size=1, verbose=0, use_multiprocessing=True)
+        self.net.fit(inputs, outputs, batch_size=None, verbose=0, use_multiprocessing=True)
 
     def getOutputs(self):
         """
@@ -416,7 +397,7 @@ class DummyGame(Environment):
 
     def playGame(self, qModel, learn=False, printPos=False):
         """
-        Play the game using the given QTable
+        Play the game using the given QModel
         :param qModel: The table or network to use for making decisions
         :param learn: True to also update the given qTable as this model learns, False otherwise, default False
         :param printPos: True if the position should be printed after each move, False otherwise, default False

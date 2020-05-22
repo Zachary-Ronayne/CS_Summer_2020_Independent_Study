@@ -4,8 +4,10 @@
 TODO:
 
 Train a neural network on the grid game
-    Figure out methods with TensorFlow to make it not slow
-    Play with network settings for good performance
+    Create good training strategy
+    Should Adam be used for the net in compile?
+        make a way to update learning rate from the optimizer in net.compile
+    Should discount rate be used at all in the neural network model?
 
 """
 
@@ -17,6 +19,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from learning.QLearn import *
 
 from Constants import *
+
 
 # create a grid
 gridW, gridH = 4, 6
@@ -45,18 +48,15 @@ network = True
 
 if network:
     # make the network
-    net = Network(gridW * gridH, 5, model, inner=[100])
-
-    print(net.getOutputs())
+    net = Network(gridW * gridH, 5, model, inner=[20, 20])
 
     # train the network
     for i in range(1):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i))
-    print(net.getOutputs())
 
-    # run the final results of the game
-    # print(model.playGame(net, learn=False, printPos=True))
+    # run the final results of the trained model
+    print(model.playGame(net, learn=False, printPos=True))
 
 else:
     # make the table
