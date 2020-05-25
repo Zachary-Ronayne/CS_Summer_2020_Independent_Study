@@ -146,15 +146,13 @@ class Network(QModel):
         Initialize the network to an unlearned, default state
         """
 
-        # TODO use learning rate and discount rate
-
         # create a list of layers, initialized with the input layer as the input shape
         layers = [keras.layers.Dense(self.inner[0], activation="tanh", use_bias=True,
-                                     input_shape=(self.environment.stateSize(),))]
+                                     input_shape=(self.states,))]
 
         # add all remaining hidden layers
         for lay in self.inner[1:]:
-            layers.append(keras.layers.Dense(lay, activation="tanh", use_bias=True))
+            layers.append(keras.layers.Dense(lay, activation="sigmoid", use_bias=True))
 
         # create the output layer
         layers.append(keras.layers.Dense(self.actions, activation="linear", use_bias=True))
@@ -162,35 +160,33 @@ class Network(QModel):
         # create the network object
         self.net = keras.Sequential(layers)
 
-        # set all biases to zero, and the weights to near zero
-        # account for the size of the output layer
-        biases = self.inner
-        biases.append(self.actions)
-
-        # set the values
-        for bias, lay in zip(biases, layers):
-            lay.set_weights([
-                np.zeros(np.array(lay.get_weights()[0]).shape),
-                np.full((bias,), 0.1)
-            ])
-
         # compile and finish building network
         # TODO should Adam be used here?
         self.net.compile(optimizer=keras.optimizers.Adam(learning_rate=self.learnRate), loss="categorical_crossentropy")
 
     def train(self, oldS, oldA, s, a):
-        # get the outputs and inputs based on the current state for the current
+        # TODO use discount rate
+        # TODO make this a good training strategy
+        # set the inputs based on the current state
         inputs = self.getInputs()
-        outputs = self.getOutputs()
 
-        # add the appropriate reward values to the expected output
-        # TODO is this an effective training strategy? Probably not
-        add = np.zeros((self.actions,))
+        # find the reward for each output
+        outputs = np.zeros((1, self.actions))
         for i in range(self.actions):
-            add[i] = self.environment.rewardFunc(s, i)
-        outputs += add
+            outputs[0][i] = self.environment.rewardFunc(s, i)
 
+        # train the network on the input and expected output
         self.net.fit(inputs, outputs, batch_size=None, verbose=0, use_multiprocessing=True)
+
+        # TODO attempt this implementation:
+
+        # get the action to take, and q values, using the 1s or 0s inputs,
+        # pick a random action if exploration rate is lower than random value
+        #   this means exploration rate is used here, should also modify QTable implementation to follow this
+        # determine q values again?
+        # pick the max q values from the above step
+        # the target values array is the reward from the action, plus the discount rate times the new q value
+        # now train, using the target values array as the expected output?
 
     def getOutputs(self):
         """
@@ -204,8 +200,8 @@ class Network(QModel):
         Get the inputs for the network
         :return: The inputs as a numpy array to be fed into the network
         """
-        inputs = np.zeros((1, self.environment.stateSize()))
-        inputs[0] = self.environment.toState()
+        inputs = np.zeros((1, self.states))
+        inputs[0][self.environment.currentState()] = 1
         return inputs
 
     def getActions(self, s):
@@ -238,6 +234,14 @@ class Environment:
         return np.zeros((0,))
 
     @abc.abstractmethod
+    def currentState(self):
+        """
+        Get the current state of this model
+        :return: the state
+        """
+        return 0
+
+    @abc.abstractmethod
     def rewardFunc(self, s, a):
         """
         Determine the reward for the given action during the given state
@@ -250,7 +254,7 @@ class Environment:
 
 class DummyGame(Environment):
 
-    def __init__(self, grid, rewards=None, pos=(0, 0), explorationRate=0.5):
+    def __init__(self, grid, rewards=None, pos=(0, 0)):
         """
         Create a dummy game for Q learning. This is a grid where moving to a new square gives different reward.
             Moving from one square to another is reduces reward
@@ -267,8 +271,6 @@ class DummyGame(Environment):
 
         self.defaultPos = pos
         self.x, self.y = pos
-
-        self.explorationRate = explorationRate
 
     def pos(self, s):
         """
@@ -290,10 +292,6 @@ class DummyGame(Environment):
         return x + y * self.width()
 
     def currentState(self):
-        """
-        Get the current state of this model
-        :return: the state
-        """
         return self.state(self.x, self.y)
 
     def width(self):

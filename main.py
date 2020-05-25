@@ -5,9 +5,14 @@ TODO:
 
 Train a neural network on the grid game
     Create good training strategy
+        Find Q values of next state, and use the maximum Q value of that state to backpropagate?
+            page 108 in book
+
+    Find new source of slow speed in network code, probably the training and set up time
     Should Adam be used for the net in compile?
         make a way to update learning rate from the optimizer in net.compile
     Should discount rate be used at all in the neural network model?
+    Allow for network to have no hidden layers, it throws an error if there are none
 
 """
 
@@ -44,18 +49,19 @@ grid[2, 3] = GOOD
 model = DummyGame(grid)
 
 # use the network model, or the QTable model
-network = True
+network = False
 
 if network:
     # make the network
-    net = Network(gridW * gridH, 5, model, inner=[20, 20])
+    net = Network(gridW * gridH, 5, model, inner=[100], learnRate=0.0001, explorationRate=1)
 
     # train the network
-    for i in range(1):
+    for i in range(10):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i))
 
     # run the final results of the trained model
+    net.explorationRate = 0
     print(model.playGame(net, learn=False, printPos=True))
 
 else:
