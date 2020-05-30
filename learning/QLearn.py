@@ -1,5 +1,6 @@
-import numpy as np
 from tensorflow import keras
+import tensorflow as tf
+import tensorflow.python as tfp
 
 import random
 import abc
@@ -14,7 +15,7 @@ class QModel:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, states, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, states, actions, environment, learnRate=0.1, discountRate=0.5, explorationRate=0.5):
         """
         Create a QModel with the given parameters
         :param states: The number of states
@@ -48,7 +49,7 @@ class QModel:
         if random.random() > self.explorationRate:
             action = actions.index(max(actions))
         else:
-            action = random.randint(0, self.actions)
+            action = random.randint(0, self.actions - 1)
 
         return action
 
@@ -63,15 +64,13 @@ class QModel:
         return []
 
     @abc.abstractmethod
-    def train(self, oldS, oldA, s, a):
+    def train(self, state, action):
         """
-        Modify the QModel to change based on the given states and actions
-        :param oldS: the old state
-        :param oldA: the old action
-        :param s: The next state to go to
-        :param a: The action taken
+        Modify the QModel to change based on the given states and actions. In the process of training,
+            one step in the environment should be taken
+        :param state: the state of the environment
+        :param action: the action to take
         """
-        pass
 
 
 class Table(QModel):
@@ -100,20 +99,27 @@ class Table(QModel):
         """
         self.qTable = np.zeros((self.states, self.actions))
 
-    def train(self, oldS, oldA, s, a):
+    def train(self, state, action):
+        # take the action
+        self.environment.takeAction(action)
+
+        # get the new state after that action
+        newState = self.environment.currentState()
+
+        # apply bellman function to update QTable
         if SIMPLE_BELLMAN:
             # simplified bellman function
-            self.qTable[oldS, oldA] = self.learnRate * (self.environment.rewardFunc(oldS, oldA) +
-                                                        self.environment.maxState(s, a))
+            self.qTable[state, action] = self.learnRate * (self.environment.rewardFunc(state, action) +
+                                                           self.environment.maxState(newState, action))
         else:
             # complex bellman function
-            self.qTable[oldS, oldA] = self.qTable[oldS, oldA] + self.learnRate * (
-                    self.environment.rewardFunc(oldS, oldA) - self.qTable[oldS, oldA] +
-                    self.discountRate * (max(self.qTable[s]))
+            self.qTable[state, action] = self.qTable[state, action] + self.learnRate * (
+                    self.environment.rewardFunc(state, action) - self.qTable[state, action] +
+                    self.discountRate * (max(self.qTable[newState]))
             )
 
     def getActions(self, s):
-        return [self.qTable[s, i] for i in range(4)]
+        return [self.qTable[s, i] for i in range(self.actions)]
 
 
 class Network(QModel):
@@ -138,7 +144,18 @@ class Network(QModel):
         if inner is None:
             inner = []
         self.inner = inner
+
         self.net = None
+        self.inputs = None
+        self.weights = None
+        self.q_out = None
+        self.predict = None
+        self.next_Q = None
+        self.loss = None
+        self.trainer = None
+        self.updateModel = None
+        self.Q_output = None
+
         self.initNetwork()
 
     def initNetwork(self):
@@ -146,14 +163,35 @@ class Network(QModel):
         Initialize the network to an unlearned, default state
         """
 
+        """
+        tf.compat.v1.disable_eager_execution()
+
+        tfp.reset_default_graph()
+        self.inputs = tfp.placeholder(shape=(1, self.states), dtype=tf.float32)
+        self.weights = tfp.Variable(initial_value=np.zeros((self.states, self.actions)),
+                                    shape=(self.states, self.actions), dtype=tf.float32)
+
+        self.q_out = tfp.matmul(self.inputs, self.weights)
+        self.predict = tfp.argmax(self.q_out, 1)
+
+        self.next_Q = tfp.placeholder(shape=(1, self.actions), dtype=tf.float32)
+        self.Q_output = tfp.Variable(initial_value=np.zeros((1, self.actions)),
+                                     shape=(1, self.actions), dtype=tf.float32)
+
+        self.loss = tfp.reduce_sum(tf.square(self.next_Q - self.Q_output))
+        self.trainer = tfp.train.GradientDescentOptimizer(learning_rate=self.learnRate)
+        self.updateModel = self.trainer.minimize(self.loss)
+        """
+
         # create a list of layers, initialized with the input layer as the input shape
-        layers = [keras.layers.Dense(self.inner[0], activation="tanh", use_bias=True,
+        layers = [keras.layers.Dense(self.inner[0], activation="sigmoid", use_bias=True,
                                      input_shape=(self.states,))]
 
         # add all remaining hidden layers
         for lay in self.inner[1:]:
             layers.append(keras.layers.Dense(lay, activation="sigmoid", use_bias=True))
 
+        # TODO play with activation functions
         # create the output layer
         layers.append(keras.layers.Dense(self.actions, activation="linear", use_bias=True))
 
@@ -164,29 +202,68 @@ class Network(QModel):
         # TODO should Adam be used here?
         self.net.compile(optimizer=keras.optimizers.Adam(learning_rate=self.learnRate), loss="categorical_crossentropy")
 
-    def train(self, oldS, oldA, s, a):
-        # TODO use discount rate
-        # TODO make this a good training strategy
-        # set the inputs based on the current state
+    def train(self, state, action):
+        # TODO fix book implementation
+        # TODO use discount rate?
+
+        """
+        init = tfp.global_variables_initializer()
+
+        with tfp.Session() as sess:
+            sess.run(init)
+
+            action, q = sess.run([self.predict, self.q_out], feed_dict={
+                self.inputs: np.identity(self.states)[state:state + 1]
+            })
+
+            if np.random.rand(1) < self.explorationRate:
+                action[0] = random.randint(0, self.actions - 1)
+
+            reward = self.environment.rewardFunc(state, action[0])
+            self.environment.takeAction(action[0])
+            next_state = self.environment.currentState()
+
+            curr_q = sess.run(self.q_out, feed_dict={
+                self.inputs: np.identity(self.states)[next_state:next_state+1]
+            })
+
+            self.Q_output = curr_q
+
+            max_next_q = np.max(curr_q)
+            target_q = q
+            target_q[0, action[0]] = reward + self.learnRate * max_next_q
+
+            info, new_weights = sess.run([self.loss, self.weights], feed_dict={
+                self.inputs: np.identity(self.states)[state:state + 1],
+                self.next_Q: tfp.Variable(initial_value=target_q, shape=target_q.shape, dtype=tf.float32)
+            })
+
+            self.weights = new_weights
+            """
+        # get the state of the game before the move happens
         inputs = self.getInputs()
 
-        # find the reward for each output
-        outputs = np.zeros((1, self.actions))
-        for i in range(self.actions):
-            outputs[0][i] = self.environment.rewardFunc(s, i)
+        # get the outputs of the network at the current state
+        # this means finding the Q values for each action in the current state
+        outputs = self.getOutputs()
 
-        # train the network on the input and expected output
-        self.net.fit(inputs, outputs, batch_size=None, verbose=0, use_multiprocessing=True)
+        # get the reward for taking the given action in the given state
+        reward = self.environment.rewardFunc(state, action)
 
-        # TODO attempt this implementation:
+        # make next step in environment, meaning take the action
+        self.environment.takeAction(action)
 
-        # get the action to take, and q values, using the 1s or 0s inputs,
-        # pick a random action if exploration rate is lower than random value
-        #   this means exploration rate is used here, should also modify QTable implementation to follow this
-        # determine q values again?
-        # pick the max q values from the above step
-        # the target values array is the reward from the action, plus the discount rate times the new q value
-        # now train, using the target values array as the expected output?
+        # find Q values for that next state
+        nextOutputs = self.getOutputs()
+
+        # set the training output data values, copying the previous predictions
+        expectedOut = outputs
+
+        # set the calculated Q value for the specific action taken
+        expectedOut[0, action] = reward + self.learnRate * np.max(nextOutputs)
+
+        # train the network on the newly expected Q values
+        self.net.fit(inputs, expectedOut, batch_size=None, verbose=0, use_multiprocessing=True)
 
     def getOutputs(self):
         """
@@ -198,7 +275,8 @@ class Network(QModel):
     def getInputs(self):
         """
         Get the inputs for the network
-        :return: The inputs as a numpy array to be fed into the network
+        :return: The inputs as a numpy array to be fed into the network. All elements are 0,
+            except for the element of the current state, which is 1
         """
         inputs = np.zeros((1, self.states))
         inputs[0][self.environment.currentState()] = 1
@@ -208,7 +286,7 @@ class Network(QModel):
         # get the actions
         actions = self.getOutputs()
         # convert the actions to a list
-        return [a for a in actions]
+        return [a for a in actions[0]]
 
 
 class Environment:
@@ -251,6 +329,15 @@ class Environment:
         """
         return 0
 
+    @ abc.abstractmethod
+    def takeAction(self, action):
+        """
+        Take the given action in the environment
+        :param action: The action to take
+        :return The reward type for taking that action
+        """
+        return 0
+
 
 class DummyGame(Environment):
 
@@ -268,6 +355,9 @@ class DummyGame(Environment):
         self.rewards = rewards
         if self.rewards is None:
             self.rewards = [D_MOVE, D_GOOD, D_BAD, D_DEAD, D_WIN, D_DO_NOTHING]
+
+        # TODO make this some kind of setting for how much the rewards are reduced and using tanh
+        # self.rewards = np.tanh([0.05 * r for r in self.rewards])
 
         self.defaultPos = pos
         self.x, self.y = pos
@@ -326,11 +416,11 @@ class DummyGame(Environment):
         """
         self.grid[y, x] = a
 
-    def move(self, direction):
+    def takeAction(self, direction):
         """
         Move in the given direction if possible
         :param direction: The direction to move in, 0 = up, 1 = right, 2 = down, 3 = left
-        :return: The new grid reward type if the move was successful, None otherwise
+        :return: The new grid reward type if the move was successful, the type for doing nothing otherwise
         """
         oldX, oldY = self.x, self.y
 
@@ -344,7 +434,7 @@ class DummyGame(Environment):
             self.y += 1
 
         if oldX == self.x and oldY == self.y:
-            return None
+            return CANT_MOVE
         return self.gridP(self.x, self.y)
 
     def stateSize(self):
@@ -355,8 +445,8 @@ class DummyGame(Environment):
         arr = np.zeros((self.stateSize(),))
         size = self.width() * self.height()
 
-        # there are 5 possibilities for each grid position
-        for c in range(5):
+        # there are NUM_ACTIONS possibilities for each grid position
+        for c in range(NUM_ACTIONS):
             # go through each row
             for i, y in enumerate(self.grid):
                 # go through each position in the row
@@ -409,33 +499,24 @@ class DummyGame(Environment):
 
         square = self.gridP(self.x, self.y)
 
-        # run the model until 100 moves, or it ends the game
+        # run the model until a set number of moves, or the game ends
         while not square == WIN and not square == DEAD and moves < MAX_MOVES:
             # get the state before making an action
             state = self.state(self.x, self.y)
 
-            # save the old state
-            oldState = state
-
             # pick a direction
-            direction = qModel.chooseAction(state)
+            action = qModel.chooseAction(state)
 
-            # move and update game ending conditions
-            # also get the direction
-            if self.move(direction) is None:
-                action = CANT_MOVE
+            # update the QModel with training
+            if learn:
+                qModel.train(state, action)
+
+            # play the game normally
             else:
-                action = direction
-
-            # get the new state after moving
-            state = self.state(self.x, self.y)
+                self.takeAction(action)
 
             # add to the total reward
-            total += self.rewardFunc(oldState, action)
-
-            # update the QModel
-            if learn:
-                qModel.train(oldState, action, state, action)
+            total += self.rewardFunc(state, action)
 
             # print the position
             if printPos:

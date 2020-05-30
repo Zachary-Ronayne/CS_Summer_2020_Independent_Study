@@ -1,3 +1,5 @@
+import numpy as np
+
 # indexes for rewards on grid spaces
 MOVE = 0
 GOOD = 1
@@ -22,6 +24,7 @@ LEFT = 3
 CANT_MOVE = 4
 
 # game constants
-MOVE_COST = 1
+MOVE_COST = 1  # np.tanh(1)
 MAX_MOVES = 40
 SIMPLE_BELLMAN = False
+NUM_ACTIONS = 5
