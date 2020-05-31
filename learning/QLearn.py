@@ -1,6 +1,4 @@
 from tensorflow import keras
-import tensorflow as tf
-import tensorflow.python as tfp
 
 import random
 import abc
@@ -163,26 +161,6 @@ class Network(QModel):
         Initialize the network to an unlearned, default state
         """
 
-        """
-        tf.compat.v1.disable_eager_execution()
-
-        tfp.reset_default_graph()
-        self.inputs = tfp.placeholder(shape=(1, self.states), dtype=tf.float32)
-        self.weights = tfp.Variable(initial_value=np.zeros((self.states, self.actions)),
-                                    shape=(self.states, self.actions), dtype=tf.float32)
-
-        self.q_out = tfp.matmul(self.inputs, self.weights)
-        self.predict = tfp.argmax(self.q_out, 1)
-
-        self.next_Q = tfp.placeholder(shape=(1, self.actions), dtype=tf.float32)
-        self.Q_output = tfp.Variable(initial_value=np.zeros((1, self.actions)),
-                                     shape=(1, self.actions), dtype=tf.float32)
-
-        self.loss = tfp.reduce_sum(tf.square(self.next_Q - self.Q_output))
-        self.trainer = tfp.train.GradientDescentOptimizer(learning_rate=self.learnRate)
-        self.updateModel = self.trainer.minimize(self.loss)
-        """
-
         # create a list of layers, initialized with the input layer as the input shape
         layers = [keras.layers.Dense(self.inner[0], activation="sigmoid", use_bias=True,
                                      input_shape=(self.states,))]
@@ -200,46 +178,14 @@ class Network(QModel):
 
         # compile and finish building network
         # TODO should Adam be used here?
-        self.net.compile(optimizer=keras.optimizers.Adam(learning_rate=self.learnRate), loss="categorical_crossentropy")
+        self.net.compile(optimizer=keras.optimizers.SGD(learning_rate=self.learnRate),
+                         loss=keras.losses.MeanSquaredError())
 
     def train(self, state, action):
         # TODO fix book implementation
         # TODO use discount rate?
+        # TODO try using the other kind of state thing, where every possible input is a grid
 
-        """
-        init = tfp.global_variables_initializer()
-
-        with tfp.Session() as sess:
-            sess.run(init)
-
-            action, q = sess.run([self.predict, self.q_out], feed_dict={
-                self.inputs: np.identity(self.states)[state:state + 1]
-            })
-
-            if np.random.rand(1) < self.explorationRate:
-                action[0] = random.randint(0, self.actions - 1)
-
-            reward = self.environment.rewardFunc(state, action[0])
-            self.environment.takeAction(action[0])
-            next_state = self.environment.currentState()
-
-            curr_q = sess.run(self.q_out, feed_dict={
-                self.inputs: np.identity(self.states)[next_state:next_state+1]
-            })
-
-            self.Q_output = curr_q
-
-            max_next_q = np.max(curr_q)
-            target_q = q
-            target_q[0, action[0]] = reward + self.learnRate * max_next_q
-
-            info, new_weights = sess.run([self.loss, self.weights], feed_dict={
-                self.inputs: np.identity(self.states)[state:state + 1],
-                self.next_Q: tfp.Variable(initial_value=target_q, shape=target_q.shape, dtype=tf.float32)
-            })
-
-            self.weights = new_weights
-            """
         # get the state of the game before the move happens
         inputs = self.getInputs()
 
@@ -258,12 +204,23 @@ class Network(QModel):
 
         # set the training output data values, copying the previous predictions
         expectedOut = outputs
+        # TODO remove print statements
+        # print(inputs)
+        # print("expected before: " + str(expectedOut))
 
         # set the calculated Q value for the specific action taken
-        expectedOut[0, action] = reward + self.learnRate * np.max(nextOutputs)
+        # TODO decide if the simple or complex bellman function should be used
+        # expectedOut[0, action] = reward + (np.max(nextOutputs)) * self.learnRate
+        expectedOut[0, action] = expectedOut[0, action] + self.learnRate * (
+                reward - expectedOut[0, action] +
+                self.discountRate * (np.max(nextOutputs)))
+        # print(" expected after: " + str(expectedOut))
 
         # train the network on the newly expected Q values
+        # print("     out before: " + str(self.getOutputs()))
         self.net.fit(inputs, expectedOut, batch_size=None, verbose=0, use_multiprocessing=True)
+        # print("      out after: " + str(self.getOutputs()))
+        # print()
 
     def getOutputs(self):
         """

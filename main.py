@@ -29,30 +29,44 @@ from Constants import *
 
 
 # create a grid
-# gridW, gridH = 4, 6
-gridW, gridH = 3, 1
-startX, startY = 1, 0
+
+gridUse = 1
+
+if gridUse == 0:
+    gridW, gridH = 3, 1
+    startX, startY = 1, 0
+elif gridUse == 1:
+    gridW, gridH = 5, 1
+    startX, startY = 2, 0
+else:
+    gridW, gridH = 4, 6
+    startX, startY = 0, 0
+
 grid = np.zeros((gridH, gridW), dtype=np.int32)
 
-grid[0, 0] = WIN
-grid[0, 2] = DEAD
+if gridUse == 0:
+    grid[0, 0] = WIN
+    grid[0, 2] = DEAD
+elif gridUse == 1:
+    grid[0, 0] = WIN
+    grid[0, 4] = DEAD
+    grid[0, 1] = BAD
+    grid[0, 3] = GOOD
+else:
+    grid[5, 3] = WIN
+    grid[3, 3] = DEAD
 
-"""
-grid[5, 3] = WIN
-grid[3, 3] = DEAD
+    grid[1, 0] = BAD
+    grid[2, 0] = GOOD
+    grid[3, 0] = GOOD
+    grid[3, 1] = GOOD
+    grid[3, 2] = GOOD
 
-grid[1, 0] = BAD
-grid[2, 0] = GOOD
-grid[3, 0] = GOOD
-grid[3, 1] = GOOD
-grid[3, 2] = GOOD
-
-grid[0, 1] = GOOD
-grid[0, 2] = GOOD
-grid[0, 3] = GOOD
-grid[1, 3] = GOOD
-grid[2, 3] = GOOD
-"""
+    grid[0, 1] = GOOD
+    grid[0, 2] = GOOD
+    grid[0, 3] = GOOD
+    grid[1, 3] = GOOD
+    grid[2, 3] = GOOD
 
 
 # make the model
@@ -63,15 +77,16 @@ network = True
 
 if network:
     # make the network
-    net = Network(gridW * gridH, NUM_ACTIONS, model, inner=[20], learnRate=0.1, explorationRate=.71)
+    net = Network(gridW * gridH, NUM_ACTIONS, model, inner=[20],
+                  learnRate=0.01, explorationRate=1)
 
     # train the network
-    for i in range(5):
+    for i in range(10):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
 
     # run the final results of the trained model
-    net.explorationRate = 0
+    net.explorationRate = 0.1
     print("Final score: " + str(model.playGame(net, learn=False, printPos=True)))
 
     print("Outputs: " + str(net.getOutputs()))
