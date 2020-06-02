@@ -11,6 +11,7 @@ D_MOVE = 0
 D_GOOD = 1
 D_BAD = -3
 D_DEAD = -10
+D_STUCK = -10
 D_WIN = 10
 D_DO_NOTHING = -1
 
@@ -29,3 +30,5 @@ NUM_ACTIONS = 5
 
 # True if the AI should be able to do nothing during a move, or if they have to pick a move that actually moves them
 ENABLE_DO_NOTHING = False
+
+TRACK_MOVE_HISTORY = True

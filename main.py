@@ -4,11 +4,7 @@
 TODO:
 
 Train a neural network on the grid game
-    Make training strategy good
-
     Find new source of slow speed in network code, probably the training and set up time
-    Make a way to update learning rate from the optimizer in net.compile
-    Allow for network to have no hidden layers, it throws an error if there are none
 
     Add ability for player to play and train network
 
@@ -26,7 +22,7 @@ from Constants import *
 
 # create a grid
 
-gridUse = 1
+gridUse = 4
 
 if gridUse == 0:
     gridW, gridH = 3, 1
@@ -78,6 +74,11 @@ else:
     grid[0, 3] = GOOD
     grid[1, 3] = GOOD
     grid[2, 3] = GOOD
+    """
+    grid[2, 2] = GOOD
+    grid[4, 2] = GOOD
+    grid[4, 3] = GOOD
+    """
 
 
 # make the model
@@ -89,10 +90,10 @@ network = True
 if network:
     # make the network
     net = Network(NUM_ACTIONS, model, inner=[],
-                  learnRate=0.1, explorationRate=0.7, discountRate=0.1)
+                  learnRate=0.1, explorationRate=0.4, discountRate=1.0)
 
     # train the network
-    for i in range(15):
+    for i in range(100):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
 

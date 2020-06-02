@@ -43,7 +43,7 @@ class QModel:
             Must return True if the action can be taken, False otherwise.
             The function should take only one parameter, the action to be taken.
             It is assumed that at least one action can always be taken.
-        :return: The action to take
+        :return: The action to take, None if no action can be taken
         """
         # get a list of all the rewards for each action in the current state
         actions = self.getActions(state)
@@ -58,6 +58,8 @@ class QModel:
         else:
             # get a list of all the valid actions
             actions = chooseElements(actions, keep=takeAction)
+            if len(actions) == 0:
+                return None
 
             # randomly choose to pick a random action, or the best available action
             if random.random() > self.explorationRate:
@@ -90,6 +92,14 @@ class QModel:
             Must return True if the action can be taken, False otherwise.
             The function should take only one parameter, the action to be taken.
             It is assumed that at least one action can always be taken.
+        :return True if the function happened successfully, False otherwise
+        """
+
+    @abc.abstractmethod
+    def updateLearningRate(self, newRate):
+        """
+        Update the learning rate of this QModel, this should also update any other objects that use a learning rate
+        :param newRate: The new learning rate
         """
 
 
@@ -140,8 +150,13 @@ class Table(QModel):
                     self.discountRate * (max(self.qTable[newState]))
             )
 
+        return True
+
     def getActions(self, s):
         return [self.qTable[s, i] for i in range(self.actions)]
+
+    def updateLearningRate(self, newRate):
+        self.learnRate = newRate
 
 
 class Network(QModel):
@@ -167,6 +182,8 @@ class Network(QModel):
         self.inner = inner
 
         self.net = None
+        self.optimizer = None
+        self.updateLearningRate(learnRate)
 
         self.initNetwork()
 
@@ -192,11 +209,10 @@ class Network(QModel):
 
         # compile and finish building network
         # TODO what optimizer and loss should be used?
-        self.net.compile(optimizer=keras.optimizers.RMSprop(learning_rate=self.learnRate),
+        self.net.compile(optimizer=self.optimizer,
                          loss=keras.losses.MeanSquaredError())
 
     def train(self, state, action, takeAction=None):
-        # TODO make training work correctly
         # get the state of the game before the move happens
         inputs = self.getInputs()
 
@@ -216,15 +232,21 @@ class Network(QModel):
         # set the training output data values, copying the previous predictions
         expectedOut = outputs
 
-        # set the calculated Q value for the specific action taken
+        success = True
 
+        # set the calculated Q value for the specific action taken
         # choose the highest reward
         if takeAction is None:
             maxOutput = np.max(nextOutputs)
         # otherwise, choose the highest reward with the action that can be taken
         else:
             availableActions = chooseElements(nextOutputs[0], takeAction)
-            maxOutput = chooseHighestFromTuple(availableActions)[1]
+            # if no actions are available, then return
+            if len(availableActions) == 0:
+                maxOutput = self.environment.rewardFunc(state, action)
+                success = False
+            else:
+                maxOutput = chooseHighestFromTuple(availableActions)[1]
 
         if SIMPLE_BELLMAN:
             expectedOut[0, action] = reward + maxOutput * self.learnRate
@@ -235,6 +257,9 @@ class Network(QModel):
 
         # train the network on the newly expected Q values
         self.net.fit(inputs, expectedOut, verbose=0, use_multiprocessing=True, epochs=1, batch_size=None)
+
+        # return that the training happened successfully
+        return success
 
     def getOutputs(self):
         """
@@ -256,6 +281,10 @@ class Network(QModel):
         actions = self.getOutputs()
         # convert the actions to a list
         return [a for a in actions[0]]
+
+    def updateLearningRate(self, newRate):
+        self.learnRate = newRate
+        self.optimizer = keras.optimizers.RMSprop(learning_rate=self.learnRate)
 
 
 class Environment:
@@ -342,6 +371,8 @@ class DummyGame(Environment):
 
         self.defaultPos = pos
         self.x, self.y = pos
+
+        self.moveHistory = []
 
     def pos(self, s):
         """
@@ -481,11 +512,41 @@ class DummyGame(Environment):
         :param action: The action trying to be taken
         :return: True if the action can be taken, False otherwise, the DO_NOTHING action always returns false
         """
-        return not (action == CANT_MOVE or
-                    (action == UP and self.y < 1) or
-                    (action == DOWN and self.y > self.height() - 2) or
-                    (action == LEFT and self.x < 1) or
-                    (action == RIGHT and self.x > self.width() - 2))
+        canMove = not (
+                action == CANT_MOVE or
+                (action == UP and self.y < 1) or
+                (action == DOWN and self.y > self.height() - 2) or
+                (action == LEFT and self.x < 1) or
+                (action == RIGHT and self.x > self.width() - 2)
+        )
+
+        if TRACK_MOVE_HISTORY:
+            if not canMove:
+                return canMove
+
+            pos = [self.x, self.y]
+            if action == UP:
+                pos[1] -= 1
+            elif action == DOWN:
+                pos[1] += 1
+            elif action == LEFT:
+                pos[0] -= 1
+            elif action == RIGHT:
+                pos[0] += 1
+            for h in self.moveHistory:
+                if h[0] == pos[0] and h[1] == pos[1]:
+                    return False
+            return True
+
+        else:
+            return canMove
+
+    def reset(self):
+        """
+        Reset the game to a default state
+        """
+        self.x, self.y = self.defaultPos
+        self.moveHistory = []
 
     def playGame(self, qModel, learn=False, printPos=False):
         """
@@ -497,7 +558,7 @@ class DummyGame(Environment):
         """
 
         # reset them model
-        self.x, self.y = self.defaultPos
+        self.reset()
         moves = 0
         total = 0
 
@@ -505,15 +566,12 @@ class DummyGame(Environment):
 
         # run the model until a set number of moves, or the game ends
         while not square == WIN and not square == DEAD and moves < MAX_MOVES:
+            # add to the move history
+            if TRACK_MOVE_HISTORY:
+                self.moveHistory.append((self.x, self.y))
+
             # get the state before making an action
             state = self.state(self.x, self.y)
-
-            if printPos:
-                # TODO temp if block
-                print(str(qModel.getOutputs()) + "(x: " + str(self.x) + ", y: " + str(self.y) + ")")
-                # r = [self.rewardFunc(state, a) for a in range(NUM_ACTIONS)]
-                # print(r)
-                pass
 
             # pick a direction
             if ENABLE_DO_NOTHING:
@@ -522,20 +580,22 @@ class DummyGame(Environment):
                 takeA = self.canTakeAction
             action = qModel.chooseAction(state, takeAction=takeA)
 
-            # update the QModel with training
-            if learn:
-                qModel.train(state, action, takeAction=takeA)
+            if action is not None:
+                # update the QModel with training
+                if learn:
+                    if not qModel.train(state, action, takeAction=takeA):
+                        return total + self.rewardFunc(state, action) + D_STUCK
 
-            # play the game normally
-            else:
-                self.takeAction(action)
+                # play the game normally
+                else:
+                    self.takeAction(action)
 
-            # add to the total reward
-            total += self.rewardFunc(state, action)
+                # add to the total reward
+                total += self.rewardFunc(state, action)
 
-            # print the position
-            if printPos:
-                print("(x: " + str(self.x) + ", y: " + str(self.y) + ")")
+                # print the position
+                if printPos:
+                    print("(x: " + str(self.x) + ", y: " + str(self.y) + ")")
 
             # determine the value of the current grid square and account for making a move
             square = self.gridP(self.x, self.y)
