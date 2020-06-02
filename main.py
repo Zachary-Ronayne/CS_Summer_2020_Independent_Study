@@ -4,14 +4,10 @@
 TODO:
 
 Train a neural network on the grid game
-    Create good training strategy
-        Find Q values of next state, and use the maximum Q value of that state to backpropagate?
-            page 108 in book
+    Make training strategy good
 
     Find new source of slow speed in network code, probably the training and set up time
-    Should Adam be used for the net in compile?
-        make a way to update learning rate from the optimizer in net.compile
-    Should discount rate be used at all in the neural network model?
+    Make a way to update learning rate from the optimizer in net.compile
     Allow for network to have no hidden layers, it throws an error if there are none
 
     Add ability for player to play and train network
@@ -38,6 +34,12 @@ if gridUse == 0:
 elif gridUse == 1:
     gridW, gridH = 5, 1
     startX, startY = 2, 0
+elif gridUse == 2:
+    gridW, gridH = 5, 2
+    startX, startY = 2, 0
+elif gridUse == 3:
+    gridW, gridH = 2, 2
+    startX, startY = 0, 0
 else:
     gridW, gridH = 4, 6
     startX, startY = 0, 0
@@ -47,11 +49,20 @@ grid = np.zeros((gridH, gridW), dtype=np.int32)
 if gridUse == 0:
     grid[0, 0] = WIN
     grid[0, 2] = DEAD
-elif gridUse == 1:
+elif gridUse == 1 or gridUse == 2:
     grid[0, 0] = WIN
     grid[0, 4] = DEAD
     grid[0, 1] = BAD
     grid[0, 3] = GOOD
+    if gridUse == 2:
+        grid[1, 0] = GOOD
+        grid[1, 1] = GOOD
+        grid[1, 2] = GOOD
+        grid[0, 1] = DEAD
+elif gridUse == 3:
+    grid[1, 0] = GOOD
+    grid[0, 1] = BAD
+    grid[1, 1] = WIN
 else:
     grid[5, 3] = WIN
     grid[3, 3] = DEAD
@@ -70,26 +81,24 @@ else:
 
 
 # make the model
-model = DummyGame(grid, pos=(startX, startY))
+model = DummyGame(grid, sizeStates=True, pos=(startX, startY))
 
 # use the network model, or the QTable model
 network = True
 
 if network:
     # make the network
-    net = Network(gridW * gridH, NUM_ACTIONS, model, inner=[20],
-                  learnRate=0.01, explorationRate=1)
+    net = Network(NUM_ACTIONS, model, inner=[],
+                  learnRate=0.1, explorationRate=0.7, discountRate=0.1)
 
     # train the network
-    for i in range(10):
+    for i in range(15):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
 
     # run the final results of the trained model
-    net.explorationRate = 0.1
+    net.explorationRate = 0
     print("Final score: " + str(model.playGame(net, learn=False, printPos=True)))
-
-    print("Outputs: " + str(net.getOutputs()))
 
     print("Final Pos: " + str(model.x) + " " + str(model.y))
     print("Grid:")
@@ -97,18 +106,17 @@ if network:
 
 else:
     # make the table
-    qTable = Table(gridW * gridH, 5, model, learnRate=0.5, discountRate=0.7)
+    qTable = Table(NUM_ACTIONS, model, learnRate=0.5, discountRate=0.7)
 
     # train model
-    qTable.explorationRate = 0.9
+    qTable.explorationRate = 1
     for i in range(1000):
         total = model.playGame(qTable, learn=True)
 
     # run the model
     qTable.explorationRate = 0
-    for i in range(1):
-        total = model.playGame(qTable, learn=False, printPos=True)
-        print(str(model.x) + " " + str(model.y) + " " + str(total))
+    total = model.playGame(qTable, learn=False, printPos=True)
+    print(str(model.x) + " " + str(model.y) + " " + str(total))
     print()
 
     # print the game grid and q table

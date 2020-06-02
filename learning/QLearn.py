@@ -1,3 +1,5 @@
+import numpy as np
+
 from tensorflow import keras
 
 import random
@@ -32,22 +34,38 @@ class QModel:
         self.discountRate = discountRate
         self.explorationRate = explorationRate
 
-    def chooseAction(self, state):
+    def chooseAction(self, state, takeAction=None):
         """
         Choose an action to take, based on the current state.
             Can randomly be either the highest valued action, or a random action, depending on explorationRate
         :param state: The current state of the model
+        :param takeAction: A function that determines if a particular action can be taken. None to not use.
+            Must return True if the action can be taken, False otherwise.
+            The function should take only one parameter, the action to be taken.
+            It is assumed that at least one action can always be taken.
         :return: The action to take
         """
         # get a list of all the rewards for each action in the current state
         actions = self.getActions(state)
 
-        # randomly choose to either pick the index of the action with the highest value,
-        #   or a random new action, thus selecting the direction
-        if random.random() > self.explorationRate:
-            action = actions.index(max(actions))
+        if takeAction is None:
+            # randomly choose to either pick the index of the action with the highest value,
+            #   or a random new action, thus selecting the direction
+            if random.random() > self.explorationRate:
+                action = actions.index(max(actions))
+            else:
+                action = random.randint(0, self.actions - 1)
         else:
-            action = random.randint(0, self.actions - 1)
+            # get a list of all the valid actions
+            actions = chooseElements(actions, keep=takeAction)
+
+            # randomly choose to pick a random action, or the best available action
+            if random.random() > self.explorationRate:
+                # find the remaining action with the highest reward
+                action = chooseHighestFromTuple(actions)[0]
+            else:
+                # randomly select an index of the remaining actions, then select the ID of that action
+                action = actions[random.randint(0, len(actions) - 1)][0]
 
         return action
 
@@ -62,12 +80,16 @@ class QModel:
         return []
 
     @abc.abstractmethod
-    def train(self, state, action):
+    def train(self, state, action, takeAction=None):
         """
         Modify the QModel to change based on the given states and actions. In the process of training,
             one step in the environment should be taken
         :param state: the state of the environment
         :param action: the action to take
+        :param takeAction: A function that determines if a particular action can be taken. None to not use.
+            Must return True if the action can be taken, False otherwise.
+            The function should take only one parameter, the action to be taken.
+            It is assumed that at least one action can always be taken.
         """
 
 
@@ -76,17 +98,16 @@ class Table(QModel):
     A Q model that learns based on a Q Table
     """
 
-    def __init__(self, states, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, actions, environment, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
         Create a Q table that will keep track of all of the Q values for actions and states
-        :param states: The number of states
         :param actions: The number of actions
         :param environment: The model to use with this table for determining when actions can happen,
-            and potential reward
+            and potential reward. This environment determines the number of states used by this table
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
         """
-        super().__init__(states, actions, environment, learnRate, discountRate, explorationRate)
+        super().__init__(environment.numStates(), actions, environment, learnRate, discountRate, explorationRate)
 
         self.qTable = None
         self.reset()
@@ -97,7 +118,10 @@ class Table(QModel):
         """
         self.qTable = np.zeros((self.states, self.actions))
 
-    def train(self, state, action):
+    def train(self, state, action, takeAction=None):
+        """
+        Note: This implementation does not use takeAction
+        """
         # take the action
         self.environment.takeAction(action)
 
@@ -125,34 +149,24 @@ class Network(QModel):
     A Q learning model that learns based on a feed forward neural network
     """
 
-    def __init__(self, states, actions, environment, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, actions, environment, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
         Create a Network for Q learning for training a model
-        :param states: The number of states
         :param actions: The number of actions
         :param environment: The environment to use with this table for determining when actions can happen,
-            and potential reward
+            and potential reward. This environment determines the number of states used by the network
         :param inner: The inner layers of the Network, None to have no inner layers, default None.
             Should only be positive integers
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
         """
-        super().__init__(states, actions, environment, learnRate, discountRate, explorationRate)
+        super().__init__(environment.numStates(), actions, environment, learnRate, discountRate, explorationRate)
 
         if inner is None:
             inner = []
         self.inner = inner
 
         self.net = None
-        self.inputs = None
-        self.weights = None
-        self.q_out = None
-        self.predict = None
-        self.next_Q = None
-        self.loss = None
-        self.trainer = None
-        self.updateModel = None
-        self.Q_output = None
 
         self.initNetwork()
 
@@ -162,14 +176,14 @@ class Network(QModel):
         """
 
         # create a list of layers, initialized with the input layer as the input shape
-        layers = [keras.layers.Dense(self.inner[0], activation="sigmoid", use_bias=True,
+        layers = [keras.layers.Dense(self.states, activation="sigmoid", use_bias=True,
                                      input_shape=(self.states,))]
 
         # add all remaining hidden layers
-        for lay in self.inner[1:]:
-            layers.append(keras.layers.Dense(lay, activation="sigmoid", use_bias=True))
+        if len(self.inner) > 0:
+            for lay in self.inner:
+                layers.append(keras.layers.Dense(lay, activation="sigmoid", use_bias=True))
 
-        # TODO play with activation functions
         # create the output layer
         layers.append(keras.layers.Dense(self.actions, activation="linear", use_bias=True))
 
@@ -177,15 +191,12 @@ class Network(QModel):
         self.net = keras.Sequential(layers)
 
         # compile and finish building network
-        # TODO should Adam be used here?
-        self.net.compile(optimizer=keras.optimizers.SGD(learning_rate=self.learnRate),
+        # TODO what optimizer and loss should be used?
+        self.net.compile(optimizer=keras.optimizers.RMSprop(learning_rate=self.learnRate),
                          loss=keras.losses.MeanSquaredError())
 
-    def train(self, state, action):
-        # TODO fix book implementation
-        # TODO use discount rate?
-        # TODO try using the other kind of state thing, where every possible input is a grid
-
+    def train(self, state, action, takeAction=None):
+        # TODO make training work correctly
         # get the state of the game before the move happens
         inputs = self.getInputs()
 
@@ -204,23 +215,26 @@ class Network(QModel):
 
         # set the training output data values, copying the previous predictions
         expectedOut = outputs
-        # TODO remove print statements
-        # print(inputs)
-        # print("expected before: " + str(expectedOut))
 
         # set the calculated Q value for the specific action taken
-        # TODO decide if the simple or complex bellman function should be used
-        # expectedOut[0, action] = reward + (np.max(nextOutputs)) * self.learnRate
-        expectedOut[0, action] = expectedOut[0, action] + self.learnRate * (
+
+        # choose the highest reward
+        if takeAction is None:
+            maxOutput = np.max(nextOutputs)
+        # otherwise, choose the highest reward with the action that can be taken
+        else:
+            availableActions = chooseElements(nextOutputs[0], takeAction)
+            maxOutput = chooseHighestFromTuple(availableActions)[1]
+
+        if SIMPLE_BELLMAN:
+            expectedOut[0, action] = reward + maxOutput * self.learnRate
+        else:
+            expectedOut[0, action] = expectedOut[0, action] + self.learnRate * (
                 reward - expectedOut[0, action] +
-                self.discountRate * (np.max(nextOutputs)))
-        # print(" expected after: " + str(expectedOut))
+                self.discountRate * maxOutput)
 
         # train the network on the newly expected Q values
-        # print("     out before: " + str(self.getOutputs()))
-        self.net.fit(inputs, expectedOut, batch_size=None, verbose=0, use_multiprocessing=True)
-        # print("      out after: " + str(self.getOutputs()))
-        # print()
+        self.net.fit(inputs, expectedOut, verbose=0, use_multiprocessing=True, epochs=1, batch_size=None)
 
     def getOutputs(self):
         """
@@ -235,9 +249,7 @@ class Network(QModel):
         :return: The inputs as a numpy array to be fed into the network. All elements are 0,
             except for the element of the current state, which is 1
         """
-        inputs = np.zeros((1, self.states))
-        inputs[0][self.environment.currentState()] = 1
-        return inputs
+        return self.environment.toState()
 
     def getActions(self, s):
         # get the actions
@@ -266,13 +278,21 @@ class Environment:
         Convert the model into a 1D numpy array that can be fed into a network as inputs
         :return: the inputs
         """
-        return np.zeros((0,))
+        return np.zeros((1, 0))
 
     @abc.abstractmethod
     def currentState(self):
         """
         Get the current state of this model
         :return: the state
+        """
+        return 0
+
+    @abc.abstractmethod
+    def numStates(self):
+        """
+        Get the number of states in this environment
+        :return: The number of states
         """
         return 0
 
@@ -298,7 +318,7 @@ class Environment:
 
 class DummyGame(Environment):
 
-    def __init__(self, grid, rewards=None, pos=(0, 0)):
+    def __init__(self, grid, rewards=None, pos=(0, 0), sizeStates=True):
         """
         Create a dummy game for Q learning. This is a grid where moving to a new square gives different reward.
             Moving from one square to another is reduces reward
@@ -306,15 +326,19 @@ class DummyGame(Environment):
         :param rewards: A list of the rewards for a corresponding action, none for default values,
             [move, good, bad, dead, win, do nothing]
         :param pos: A 2-tuple, (x, y), the starting position in the grid, default: (0, 0)
+        :param sizeStates: True if the a state should just be based on the size of the grid, one state for each
+            position of the game. Basically a normal way of using the states.
+            False if a state should be a part of the grid, and the number of different grid types.
+            Basically creating inputs of a grid of ones or zeros for each possible action.
+            Default True
+
         """
         self.grid = grid
+        self.sizeStates = sizeStates
 
         self.rewards = rewards
         if self.rewards is None:
             self.rewards = [D_MOVE, D_GOOD, D_BAD, D_DEAD, D_WIN, D_DO_NOTHING]
-
-        # TODO make this some kind of setting for how much the rewards are reduced and using tanh
-        # self.rewards = np.tanh([0.05 * r for r in self.rewards])
 
         self.defaultPos = pos
         self.x, self.y = pos
@@ -398,22 +422,33 @@ class DummyGame(Environment):
         return 5 * self.width() * self.height()
 
     def toState(self):
-        # create an array of appropriate size
-        arr = np.zeros((self.stateSize(),))
-        size = self.width() * self.height()
+        if self.sizeStates:
+            inputs = np.zeros((1, self.numStates()))
+            inputs[0][self.currentState()] = 1
+            return inputs
+        else:
+            # create an array of appropriate size
+            arr = np.zeros((1, self.stateSize()))
+            size = self.width() * self.height()
 
-        # there are NUM_ACTIONS possibilities for each grid position
-        for c in range(NUM_ACTIONS):
-            # go through each row
-            for i, y in enumerate(self.grid):
-                # go through each position in the row
-                for j, x in enumerate(y):
-                    # get the position in the array
-                    pos = c * size + i * self.width() + j
-                    # if the id of the grid position matches the current grid position,
-                    #   set the array to 1, 0 otherwise
-                    arr[pos] = 1 if x == c else 0
-        return arr
+            # there are NUM_ACTIONS possibilities for each grid position
+            for c in range(NUM_ACTIONS):
+                # go through each row
+                for i, y in enumerate(self.grid):
+                    # go through each position in the row
+                    for j, x in enumerate(y):
+                        # get the position in the array
+                        pos = c * size + i * self.width() + j
+                        # if the id of the grid position matches the current grid position,
+                        #   set the array to 1, 0 otherwise
+                        arr[0][pos] = 1 if x == c else 0
+            return arr
+
+    def numStates(self):
+        s = self.width() * self.height()
+        if self.sizeStates:
+            return s
+        return s * NUM_ACTIONS
 
     def rewardFunc(self, s, a):
         # can't move, punish for corresponding punishment for not moving
@@ -440,6 +475,18 @@ class DummyGame(Environment):
         # return the reward in the square, along with the cost of moving
         return self.rewards[self.gridP(x, y)] - MOVE_COST
 
+    def canTakeAction(self, action):
+        """
+        Determine if the given action can be taken, based on the current state of the game
+        :param action: The action trying to be taken
+        :return: True if the action can be taken, False otherwise, the DO_NOTHING action always returns false
+        """
+        return not (action == CANT_MOVE or
+                    (action == UP and self.y < 1) or
+                    (action == DOWN and self.y > self.height() - 2) or
+                    (action == LEFT and self.x < 1) or
+                    (action == RIGHT and self.x > self.width() - 2))
+
     def playGame(self, qModel, learn=False, printPos=False):
         """
         Play the game using the given QModel
@@ -461,12 +508,23 @@ class DummyGame(Environment):
             # get the state before making an action
             state = self.state(self.x, self.y)
 
+            if printPos:
+                # TODO temp if block
+                print(str(qModel.getOutputs()) + "(x: " + str(self.x) + ", y: " + str(self.y) + ")")
+                # r = [self.rewardFunc(state, a) for a in range(NUM_ACTIONS)]
+                # print(r)
+                pass
+
             # pick a direction
-            action = qModel.chooseAction(state)
+            if ENABLE_DO_NOTHING:
+                takeA = None
+            else:
+                takeA = self.canTakeAction
+            action = qModel.chooseAction(state, takeAction=takeA)
 
             # update the QModel with training
             if learn:
-                qModel.train(state, action)
+                qModel.train(state, action, takeAction=takeA)
 
             # play the game normally
             else:
@@ -484,3 +542,27 @@ class DummyGame(Environment):
             moves += 1
 
         return total
+
+
+def chooseElements(arr, keep):
+    """
+    Take a list of elements, and remove certain elements determined by keep.
+    :param arr: The list of elements
+    :param keep: A function returning True if an element in keep should be kept, False otherwise
+    :return: The list of elements with only valid elements
+    """
+    return [(i, a) for i, a in enumerate(arr) if keep(i)]
+
+
+def chooseHighestFromTuple(arr):
+    """
+    Pick the id of the highest element of a list of tuples of the form (id, key),
+        where they key determines which value is the highest
+    :param arr: The array of elements
+    :return: A tuple of the form (id, key) of the element with the highest key
+    """
+    high = 0
+    for i, a in enumerate(arr):
+        if a[1] > arr[high][1]:
+            high = i
+    return arr[high]

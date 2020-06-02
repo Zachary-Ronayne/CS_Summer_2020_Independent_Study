@@ -1,5 +1,3 @@
-import numpy as np
-
 # indexes for rewards on grid spaces
 MOVE = 0
 GOOD = 1
@@ -24,7 +22,10 @@ LEFT = 3
 CANT_MOVE = 4
 
 # game constants
-MOVE_COST = 1  # np.tanh(1)
+MOVE_COST = 1
 MAX_MOVES = 40
 SIMPLE_BELLMAN = False
 NUM_ACTIONS = 5
+
+# True if the AI should be able to do nothing during a move, or if they have to pick a move that actually moves them
+ENABLE_DO_NOTHING = False
