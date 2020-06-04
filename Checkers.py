@@ -65,6 +65,17 @@ class Game:
         # set it to reds turn
         self.redTurn = True
 
+    def clearBoard(self):
+        """
+        Clear out the entire board, making every space empty
+        :return:
+        """
+        for y in range(self.height):
+            # fill in each spot in the row
+            for x in range(self.width):
+                yy = self.height - 1 - y
+                self.spot(x, yy, None, True)
+
     def string(self, red):
         """
         Convert the game to a string for display
@@ -174,21 +185,20 @@ class Game:
             return False
 
         # determine directions
-        x, y = movePos(x, y, left, forward, jump)
+        newX, newY = movePos(x, y, left, forward, jump)
 
         # check to see if movement for the new coordinate is in bounds
-        if not self.inRange(x, y):
+        if not self.inRange(newX, newY):
             return False
-
         # check if the piece jumped over is an enemy
         if jump:
             jX, jY = movePos(x, y, left, forward, False)
             pos = self.gridPos(jX, jY, self.redTurn)
-            if pos is None or not pos[0]:
+            if pos is None or pos[0]:
                 return False
 
         # return if the new position to move to is empty
-        return self.gridPos(x, y, self.redTurn) is None
+        return self.gridPos(newX, newY, self.redTurn) is None
 
     def validPiece(self, x, y, forward):
         """
