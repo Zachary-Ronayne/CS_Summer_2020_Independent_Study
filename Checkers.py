@@ -1,11 +1,40 @@
 from learning.QLearn import *
 
-# some constants for printing the game
+if USE_PY_GAME:
+    import pygame
+
+import time
+
+# constants for printing the game
 P_ALLY = "[A"
 P_ENEMY = "[E"
 P_NORMAL = " ]"
 P_KING = "K]"
 P_EMPTY = "[  ]"
+
+# constants for drawing the game
+DR_SQUARE_SIZE = 80
+DR_BORDER_SIZE = 20
+DR_GAME_BORDER_SIZE = 5
+DR_TOP_SPACE = 100
+DR_GRID_X = DR_BORDER_SIZE + DR_GAME_BORDER_SIZE
+DR_GRID_Y = DR_BORDER_SIZE + DR_TOP_SPACE + DR_GAME_BORDER_SIZE
+DR_PIECE_SIZE = 70
+DR_PIECE_BORDER = 3
+DR_FONT_SIZE = 50
+DR_FONT_FACE = "Arial"
+
+# color constants
+C_ON_SQUARE = (40, 40, 40)
+C_OFF_SQUARE = (220, 220, 220)
+C_RED_PIECE = (200, 0, 0)
+C_BLACK_PIECE = (20, 20, 20)
+C_RED_KING = (30, 0, 0)
+C_BLACK_KING = (170, 160, 160)
+C_PIECE_BORDER = (0, 0, 0)
+C_PIECE_HIGHLIGHT = (0, 0, 200, 127)
+C_BACKGROUND = (180, 180, 180)
+C_GAME_BORDER = (0, 0, 0)
 
 
 class Game:
@@ -330,3 +359,158 @@ class GameEnvironment(Environment):
 
     def takeAction(self, action):
         return 0
+
+
+class Gui:
+    """
+    A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
+    """
+
+    def __init__(self, game, fps=20, printFPS=False):
+        """
+        Create and display the pygame Gui with the given game.
+        Must call loop() to make the Gui stay open
+        :param game: The Checkers Game object to use with this Gui
+        :param fps: The capped frame rate of the Gui, default 20
+        :param printFPS: True to print the frames per second, every second, False otherwise, default False
+        """
+        self.game = game
+
+        # setup pygame
+        pygame.init()
+        pygame.font.init()
+
+        # create the gui object
+        # TODO pick a good size based on the game size, leave room for buttons on the top
+        #   buttons should be reset, make AI move, loop AI move?
+        self.gridWidth = self.game.height * DR_SQUARE_SIZE
+        self.gridHeight = self.game.height * DR_SQUARE_SIZE
+        self.pixelWidth = (DR_BORDER_SIZE + DR_GAME_BORDER_SIZE) * 2 + self.gridWidth
+        self.pixelHeight = (DR_BORDER_SIZE + DR_GAME_BORDER_SIZE) * 2 + self.gridHeight + DR_TOP_SPACE
+        self.gui = pygame.display.set_mode((self.pixelWidth, self.pixelHeight))
+        pygame.display.set_caption("Checkers")
+
+        # variables for tracking the clock that runs the game
+        self.running = True
+        self.fps = fps
+        self.printFPS = printFPS
+
+        # variables for drawing text
+        self.font = pygame.font.SysFont(DR_FONT_FACE, DR_FONT_SIZE)
+        self.font.set_bold(True)
+
+        # variables for tracking mouse input
+        self.selectedSquare = None
+
+    def loop(self):
+        """
+        A method that handles updating the state of the game
+        """
+        lastTime = time.time()
+        lastFrame = time.time()
+        frames = 0
+        while self.running:
+            frameTime = 1 / self.fps
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    self.running = False
+
+            currTime = time.time()
+            if currTime - lastFrame > frameTime:
+                frames += 1
+                lastFrame = time.time()
+                self.redrawPygame()
+            else:
+                time.sleep(0.01)
+
+            currTime = time.time()
+            if currTime - lastTime > 1:
+                if self.printFPS:
+                    print("FPS: " + str(frames))
+                frames = 0
+                lastTime = currTime
+
+    def redrawPygame(self):
+        """
+        Draw the current state of the Checkers Game to the pygame window
+        """
+
+        # background fill
+        self.gui.fill(C_BACKGROUND)
+
+        # draw game board border
+        pygame.draw.rect(self.gui, C_GAME_BORDER, (
+            DR_GRID_X - DR_GAME_BORDER_SIZE,
+            DR_GRID_Y - DR_GAME_BORDER_SIZE,
+            self.gridWidth + DR_GAME_BORDER_SIZE * 2, self.gridHeight + DR_GAME_BORDER_SIZE * 2
+        ))
+
+        # draw the grid squares
+        grid = self.game.redGrid
+        for j, r in enumerate(grid):
+            # iterate through each column
+            for i, c in enumerate(r):
+                self.drawSquare(j, i, c, True)
+                self.drawSquare(j, i, None, False)
+
+        # update display
+        pygame.display.update()
+
+    def drawSquare(self, r, c, piece, offset):
+        """
+        Draw a square of the game
+        :param r: The row of the square in the stored game grid
+        :param c: The column of the square in the stored game grid
+        :param piece: The piece on the square
+        :param offset: True if this square is one that never holds pieces, False otherwise
+        """
+        # get square coordinates
+        # TODO abstract this to a method which can be used with mouse input
+        x = DR_GRID_X + c * 2 * DR_SQUARE_SIZE
+        y = DR_GRID_Y + r * DR_SQUARE_SIZE
+        # offset if appropriate
+        if not (r % 2 == 0 ^ offset):
+            x += DR_SQUARE_SIZE
+
+        # draw the square
+        square = (x, y, DR_SQUARE_SIZE, DR_SQUARE_SIZE)
+        pygame.draw.rect(self.gui, C_OFF_SQUARE if offset else C_ON_SQUARE, square)
+
+        # draw the piece, if one exists
+        if piece is not None:
+            pColor = C_RED_PIECE if piece[0] else C_BLACK_PIECE
+            kColor = C_RED_KING if piece[0] else C_BLACK_KING
+
+            # draw the piece
+            # outline
+            circleOffset = (DR_SQUARE_SIZE - DR_PIECE_SIZE) * .5 - DR_PIECE_BORDER
+            pygame.draw.ellipse(self.gui, C_PIECE_BORDER, (
+                square[0] + circleOffset, square[1] + circleOffset,
+                DR_PIECE_SIZE + DR_PIECE_BORDER * 2, DR_PIECE_SIZE + DR_PIECE_BORDER * 2
+            ))
+
+            # fill
+            circleOffset = (DR_SQUARE_SIZE - DR_PIECE_SIZE) * .5
+            pygame.draw.ellipse(self.gui, pColor, (
+                square[0] + circleOffset, square[1] + circleOffset,
+                DR_PIECE_SIZE, DR_PIECE_SIZE
+            ))
+
+            # if it is a king, draw a K on the circle
+            if piece[1]:
+                text = self.font.render("K", False, kColor)
+                self.gui.blit(text, (square[0] + DR_PIECE_SIZE * .3, square[1] + DR_FONT_SIZE * .25))
+
+        # if the piece is selected, then draw a highlight over it
+        if self.selectedSquare is not None and self.selectedSquare is piece:
+            highlight = pygame.Surface((square[2], square[3]), pygame.SRCALPHA)
+            pygame.draw.rect(highlight, C_PIECE_HIGHLIGHT, highlight.get_rect())
+            self.gui.blit(highlight, square)
+
+    def stop(self):
+        """
+        End the pygame window thread
+        :return:
+        """
+        self.running = False
+        pygame.quit()

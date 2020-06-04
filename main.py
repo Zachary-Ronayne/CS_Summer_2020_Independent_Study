@@ -18,13 +18,16 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # normal imports
 
-from Checkers import Game
+from Checkers import *
 
+
+# center pygame window
+os.environ['SDL_VIDEO_CENTERED'] = "1"
+
+# make game
 game = Game(8)
-print(game.string(True))
-game.play(0, 5, False, True, False)
-print()
-print(game.string(True))
+gui = Gui(game, printFPS=False)
+gui.loop()
 
 # create a grid
 """
