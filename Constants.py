@@ -5,6 +5,7 @@ BAD = 2
 DEAD = 3
 WIN = 4
 DO_NOTHING = 5
+NUM_REWARD_SQUARES = 5
 
 # reward values for corresponding indexes
 D_MOVE = 0
@@ -32,3 +33,6 @@ NUM_ACTIONS = 5
 ENABLE_DO_NOTHING = False
 
 TRACK_MOVE_HISTORY = True
+
+# used to stop importing TensorFlow, should only be used for testing, should be False in any ful version
+USE_TENSOR_FLOW = False

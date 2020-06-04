@@ -1,11 +1,12 @@
 import numpy as np
 
-from tensorflow import keras
+from Constants import *
+
+if USE_TENSOR_FLOW:
+    from tensorflow import keras
 
 import random
 import abc
-
-from Constants import *
 
 
 class QModel:
@@ -208,7 +209,6 @@ class Network(QModel):
         self.net = keras.Sequential(layers)
 
         # compile and finish building network
-        # TODO what optimizer and loss should be used?
         self.net.compile(optimizer=self.optimizer,
                          loss=keras.losses.MeanSquaredError())
 
@@ -463,7 +463,8 @@ class DummyGame(Environment):
             size = self.width() * self.height()
 
             # there are NUM_ACTIONS possibilities for each grid position
-            for c in range(NUM_ACTIONS):
+            # TODO see about adding player coordinates
+            for c in range(NUM_REWARD_SQUARES):
                 # go through each row
                 for i, y in enumerate(self.grid):
                     # go through each position in the row

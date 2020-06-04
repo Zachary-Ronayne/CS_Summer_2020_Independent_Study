@@ -6,6 +6,8 @@ TODO:
 Train a neural network on the grid game
     Find new source of slow speed in network code, probably the training and set up time
 
+    Try adding adaptive learning rate and discount rate
+
     Add ability for player to play and train network
 
 """
@@ -15,14 +17,18 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # normal imports
-from learning.QLearn import *
 
-from Constants import *
+from Checkers import Game
 
+game = Game(8)
+print(game.string(True))
+game.play(0, 5, False, True, False)
+print()
+print(game.string(True))
 
 # create a grid
-
-gridUse = 4
+"""
+gridUse = 2
 
 if gridUse == 0:
     gridW, gridH = 3, 1
@@ -74,11 +80,10 @@ else:
     grid[0, 3] = GOOD
     grid[1, 3] = GOOD
     grid[2, 3] = GOOD
-    """
-    grid[2, 2] = GOOD
-    grid[4, 2] = GOOD
-    grid[4, 3] = GOOD
-    """
+    
+    # grid[2, 2] = GOOD
+    # grid[4, 2] = GOOD
+    # grid[4, 3] = GOOD
 
 
 # make the model
@@ -90,10 +95,10 @@ network = True
 if network:
     # make the network
     net = Network(NUM_ACTIONS, model, inner=[],
-                  learnRate=0.1, explorationRate=0.4, discountRate=1.0)
+                  learnRate=0.1, explorationRate=0.1, discountRate=0.5)
 
     # train the network
-    for i in range(100):
+    for i in range(15):
         total = model.playGame(net, learn=True)
         print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
 
@@ -124,3 +129,4 @@ else:
     print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
     print()
     print(qTable.qTable)
+"""
