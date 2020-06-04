@@ -4,22 +4,25 @@ from Checkers import Game
 
 
 class TestGame(TestCase):
-    def test_move(self):
-        pass
-
-    def test_canMove(self):
+    def test_canPlay(self):
         game = Game(8)
         game.resetGame()
 
-        self.assertTrue(game.canMove(0, 5, False, True))
-        self.assertFalse(game.canMove(0, 5, True, True))
-        self.assertFalse(game.canMove(0, 5, True, False))
-        self.assertFalse(game.canMove(0, 5, True, False))
+        self.assertTrue(game.canPlay(0, 5, False, True, False))
+        self.assertFalse(game.canPlay(0, 5, True, True, False))
+        self.assertFalse(game.canPlay(0, 5, False, False, False))
+        self.assertFalse(game.canPlay(0, 5, True, False, False))
+        self.assertFalse(game.canPlay(0, 5, False, True, True))
+        self.assertFalse(game.canPlay(0, 5, True, True, True))
+        self.assertFalse(game.canPlay(0, 5, False, False, True))
+        self.assertFalse(game.canPlay(0, 5, True, False, True))
 
+        self.assertFalse(game.canPlay(3, 2, False, True, False))
+        self.assertFalse(game.canPlay(3, 2, True, True, False))
+        self.assertFalse(game.canPlay(3, 2, False, False, False))
+        self.assertFalse(game.canPlay(3, 2, True, False, False))
+        self.assertFalse(game.canPlay(3, 2, False, True, True))
+        self.assertFalse(game.canPlay(3, 2, True, True, True))
+        self.assertFalse(game.canPlay(3, 2, False, False, True))
+        self.assertFalse(game.canPlay(3, 2, True, False, True))
         # TODO make comprehensive test cases
-
-    def test_jump(self):
-        pass
-
-    def test_canJump(self):
-        pass

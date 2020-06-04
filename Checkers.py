@@ -145,13 +145,17 @@ class Game:
             newX, newY = movePos(x, y, left, forward, jump)
             self.spot(newX, newY, self.gridPos(x, y, self.redTurn), self.redTurn)
             self.spot(x, y, None, self.redTurn)
-            success = True
-        else:
-            success = False
+            if jump:
+                jX, jY = movePos(x, y, left, forward, False)
+                self.spot(jX, jY, None, self.redTurn)
 
-        if success:
+            changeTurns = not jump
+        else:
+            changeTurns = False
+
+        if changeTurns:
             self.redTurn = not self.redTurn
-        return success
+        return changeTurns
 
     def canPlay(self, x, y, left, forward, jump):
         """
@@ -175,6 +179,13 @@ class Game:
         # check to see if movement for the new coordinate is in bounds
         if not self.inRange(x, y):
             return False
+
+        # check if the piece jumped over is an enemy
+        if jump:
+            jX, jY = movePos(x, y, left, forward, False)
+            pos = self.gridPos(jX, jY, self.redTurn)
+            if pos is None or not pos[0]:
+                return False
 
         # return if the new position to move to is empty
         return self.gridPos(x, y, self.redTurn) is None
