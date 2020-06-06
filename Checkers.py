@@ -5,6 +5,27 @@ if USE_PY_GAME:
 
 import time
 
+# technical constants
+ENABLE_LOOP_WAIT = False
+
+# constants for ending game
+E_PLAYING = 0
+E_RED_WIN = 1
+E_BLACK_WIN = 2
+E_DRAW = 3
+E_MAX_MOVES_WITHOUT_CAPTURE = 50
+E_TEXT = [
+    "Game In Progress",
+    "Red Wins!",
+    "Black Wins!",
+    "Draw!"
+]
+E_RED_PLAYING = "Red's Turn"
+E_BLACK_PLAYING = "Black's Turn"
+E_TEXT_COLOR = (0, 0, 0)
+E_GAME_STATE_X = 10
+E_GAME_STATE_Y = 10
+
 # constants for printing the game
 P_ALLY = "[A"
 P_ENEMY = "[E"
@@ -16,7 +37,7 @@ P_EMPTY = "[  ]"
 DR_SQUARE_SIZE = 80
 DR_BORDER_SIZE = 20
 DR_GAME_BORDER_SIZE = 5
-DR_TOP_SPACE = 100
+DR_TOP_SPACE = 120
 DR_GRID_X = DR_BORDER_SIZE + DR_GAME_BORDER_SIZE
 DR_GRID_Y = DR_BORDER_SIZE + DR_TOP_SPACE + DR_GAME_BORDER_SIZE
 DR_PIECE_SIZE = 70
@@ -24,17 +45,31 @@ DR_PIECE_BORDER = 3
 DR_FONT_SIZE = 50
 DR_FONT_FACE = "Arial"
 
+# constants for instruction text at the top
+I_FONT_SIZE = 20
+I_UP_LEFT_X = 10
+I_UP_LEFT_Y = 70
+I_LINE_SPACING = 25
+I_TEXT = [
+    "R: reset game",
+    "ESC: close game"
+]
+I_TEXT_COLOR = (0, 0, 0)
+
 # color constants
-C_ON_SQUARE = (40, 40, 40)
-C_OFF_SQUARE = (220, 220, 220)
+C_ON_SQUARE = (220, 220, 220)
+C_OFF_SQUARE = (40, 40, 40)
+C_BACKGROUND = (180, 180, 180)
+C_GAME_BORDER = (0, 0, 0)
 C_RED_PIECE = (200, 0, 0)
 C_BLACK_PIECE = (20, 20, 20)
 C_RED_KING = (30, 0, 0)
 C_BLACK_KING = (170, 160, 160)
 C_PIECE_BORDER = (0, 0, 0)
-C_PIECE_HIGHLIGHT = (0, 0, 200, 127)
-C_BACKGROUND = (180, 180, 180)
-C_GAME_BORDER = (0, 0, 0)
+C_SELECTED_HIGHLIGHT = (0, 0, 200, 140)
+C_HOVER_HIGHLIGHT = (0, 0, 230, 50)
+C_MOVE_HIGHLIGHT = (0, 200, 0, 127)
+C_CAPTURE_HIGHLIGHT = (200, 0, 0, 127)
 
 
 class Game:
@@ -66,7 +101,12 @@ class Game:
         self.redGrid = None
         self.blackGrid = None
         self.redTurn = None
+        self.redLeft = 0
+        self.blackLeft = 0
         self.resetGame()
+
+        self.win = E_PLAYING
+        self.movesSinceLastCapture = 0
 
     def resetGame(self):
         """
@@ -83,16 +123,23 @@ class Game:
         # fill in all but the 2 middle rows
         fill = self.height // 2 - 1
 
+        # track the number of each piece
+        self.redLeft = 0
+        self.blackLeft = 0
+
         # fill in each row
         for y in range(fill):
             # fill in each spot in the row
             for x in range(self.width):
                 yy = self.height - 1 - y
-                self.spot(x, yy, (True, False), False)
+                # add red piece
                 self.spot(x, yy, (True, False), True)
+                # add black piece
+                self.spot(x, yy, (True, False), False)
 
         # set it to reds turn
         self.redTurn = True
+        self.win = E_PLAYING
 
     def clearBoard(self):
         """
@@ -133,6 +180,15 @@ class Game:
         # return the final result
         return "\n".join(text)
 
+    def oppositeGrid(self, p):
+        """
+        Get the coordinates of a place in the grid from the opposing side of the given coordinates
+        :param p: A 2-tuple the original x, y
+        :return: A 2-tuple (x, y) of the original x and y, but from the perspective of the other side of the board
+        """
+        x, y = p
+        return self.width - 1 - x, self.height - 1 - y
+
     def spot(self, x, y, value, red):
         """
         Set the value at a position in the grid
@@ -141,8 +197,11 @@ class Game:
         :param value: The new value
         :param red: True if this should access from Red size, False otherwise
         """
+
+        oldSpace = self.redGrid[y][x] if red else self.blackGrid[y][x]
+
         allyX, allyY = x, y
-        enemyX, enemyY = self.width - 1 - allyX, self.height - 1 - allyY
+        enemyX, enemyY = self.oppositeGrid((allyX, allyY))
         if value is None:
             ally = None
             enemy = None
@@ -155,6 +214,20 @@ class Game:
         else:
             self.redGrid[enemyY][enemyX] = enemy
             self.blackGrid[allyY][allyX] = ally
+
+        newSpace = self.redGrid[y][x] if red else self.blackGrid[y][x]
+
+        if not newSpace == oldSpace:
+            if newSpace is not None:
+                if newSpace[0] == red:
+                    self.redLeft += 1
+                else:
+                    self.blackLeft += 1
+            if oldSpace is not None:
+                if oldSpace[0] == red:
+                    self.redLeft -= 1
+                else:
+                    self.blackLeft -= 1
 
     def gridPos(self, x, y, red):
         """
@@ -179,15 +252,34 @@ class Game:
         :param left: True to move left, False to move Right
         :param forward: True to move forward, False to move backwards
         :param jump: True if this move is a jump, False if it is a normal move
-        :return: True if the move happened and it is now the other players turn, False otherwise
+        :return: True if it is now the other players turn, False otherwise
         """
+        # cannot play at all if the game is not playing
+        if not self.win == E_PLAYING:
+            return False
+
         if self.canPlay(x, y, left, forward, jump):
             newX, newY = movePos(x, y, left, forward, jump)
-            self.spot(newX, newY, self.gridPos(x, y, self.redTurn), self.redTurn)
+
+            newPiece = self.gridPos(x, y, self.redTurn)
+
+            # set the piece to a king if it reaches the end
+            if newY == 0:
+                newPiece = (newPiece[0], True)
+
+            self.spot(newX, newY, newPiece, self.redTurn)
             self.spot(x, y, None, self.redTurn)
+            # a capture has happened
             if jump:
+                self.movesSinceLastCapture = 0
                 jX, jY = movePos(x, y, left, forward, False)
                 self.spot(jX, jY, None, self.redTurn)
+
+            # update number of moves
+            self.movesSinceLastCapture += 1
+
+            # see if the game is over
+            self.checkWinConditions()
 
             changeTurns = not jump
         else:
@@ -210,6 +302,7 @@ class Game:
         :param jump: True if this move is a jump, False if it is a normal move
         :return True if the piece can make the move, False otherwise
         """
+
         if not self.validPiece(x, y, forward):
             return False
 
@@ -228,6 +321,77 @@ class Game:
 
         # return if the new position to move to is empty
         return self.gridPos(newX, newY, self.redTurn) is None
+
+    def checkWinConditions(self):
+        """
+        See if the game is over, and set win to the appropriate value
+        """
+        # if the game is already over, no need to check
+        if not self.win == E_PLAYING:
+            return
+
+        # if too many moves have happened with no captures, the game is a draw
+        if self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
+            self.win = E_DRAW
+            return
+
+        # see if no one can make any moves
+        noMoves = True
+        self.redTurn = not self.redTurn
+        # iterate through rows
+        for j in range(self.height):
+            # iterate through the columns of each row
+            for i in range(self.width):
+                # if the spot contains a piece and that piece is an ally
+                c = self.gridPos(i, j, self.redTurn)
+                potentialMoves = self.calculateMoves((i, j))
+                if c is not None and c[0]:
+                    # find the moves of that piece
+                    # if at least one of those moves is valid, then there are not no moves
+                    for p in potentialMoves:
+                        if p is not None:
+                            noMoves = False
+                            break
+                # break each of the outer loops if a move is found
+                if not noMoves:
+                    break
+            if not noMoves:
+                break
+        self.redTurn = not self.redTurn
+
+        # if black has no pieces, red wins
+        # if red has no pieces, black wins
+        # if no one has any pieces, or no one can move, it's a draw
+        if (self.redLeft == 0 and self.blackLeft == 0) or noMoves:
+            self.win = E_DRAW
+        elif self.redLeft == 0:
+            self.win = E_BLACK_WIN
+        elif self.blackLeft == 0:
+            self.win = E_RED_WIN
+        else:
+            self.win = E_PLAYING
+
+    def calculateMoves(self, s):
+        """
+        Given the grid coordinates of a square, determine the list of moves that can be played by that piece.
+        :param s: The coordinates of a square
+        :return The list of moves, a list of 8, 2-tuples, (x, y) of moves that can be taken,
+            or None if that move cannot be taken. The move index is based on binary,
+            4s place = left, 2s place = forward, 1s place = jump
+            Coordinates relative to the current players turn
+        """
+        playMoves = []
+        # 8 different possible moves
+        for i in range(8):
+            bins = moveIntToBoolList(i)
+            # check if the move can be played
+            if self.canPlay(s[0], s[1], bins[0], bins[1], bins[2]):
+                # determine the position of the move
+                move = movePos(s[0], s[1], bins[0], bins[1], bins[2])
+                playMoves.append(move)
+            else:
+                playMoves.append(None)
+        return playMoves
 
     def validPiece(self, x, y, forward):
         """
@@ -381,8 +545,6 @@ class Gui:
         pygame.font.init()
 
         # create the gui object
-        # TODO pick a good size based on the game size, leave room for buttons on the top
-        #   buttons should be reset, make AI move, loop AI move?
         self.gridWidth = self.game.height * DR_SQUARE_SIZE
         self.gridHeight = self.game.height * DR_SQUARE_SIZE
         self.pixelWidth = (DR_BORDER_SIZE + DR_GAME_BORDER_SIZE) * 2 + self.gridWidth
@@ -396,11 +558,20 @@ class Gui:
         self.printFPS = printFPS
 
         # variables for drawing text
-        self.font = pygame.font.SysFont(DR_FONT_FACE, DR_FONT_SIZE)
+        self.font = makeFont(DR_FONT_FACE, DR_FONT_SIZE)
         self.font.set_bold(True)
 
         # variables for tracking mouse input
+        self.hoverSquare = None
         self.selectedSquare = None
+
+        # playMoves should be either None, or a list of exactly 8 elements
+        #   each element is None, or a 2-tuple of the grid coordinates to where the selected piece can move
+        self.playMoves = None
+
+        # captureMoves should either be None, or a list of up to 4 elements
+        #   each element is None, or a 2-tuple of the grid coordinates where a piece can be captured
+        self.captureMoves = None
 
     def loop(self):
         """
@@ -411,16 +582,15 @@ class Gui:
         frames = 0
         while self.running:
             frameTime = 1 / self.fps
-            for e in pygame.event.get():
-                if e.type == pygame.QUIT:
-                    self.running = False
+            self.handleEvents()
 
             currTime = time.time()
             if currTime - lastFrame > frameTime:
                 frames += 1
                 lastFrame = time.time()
                 self.redrawPygame()
-            else:
+            elif ENABLE_LOOP_WAIT:
+                # wait a bit of time to prevent the loop from running unnecessarily long amounts of time
                 time.sleep(0.01)
 
             currTime = time.time()
@@ -429,6 +599,143 @@ class Gui:
                     print("FPS: " + str(frames))
                 frames = 0
                 lastTime = currTime
+
+    def handleEvents(self):
+        """
+        A method that handles events that happen each loop of the pygame window
+        """
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                self.running = False
+            elif e.type == pygame.MOUSEMOTION:
+                self.handleMouseMove()
+            elif e.type == pygame.MOUSEBUTTONDOWN:
+                self.handleMouseUp()
+            elif e.type == pygame.KEYUP:
+                self.handleKeyUp(e)
+
+    def handleMouseMove(self):
+        """
+        This method is run every time pygame detects a mouse movement
+        """
+
+        # only select a square to hover over while the game is not over
+        if self.game.win == E_PLAYING:
+            mPos = pygame.mouse.get_pos()
+            gPos = self.mouseToGrid(mPos[0], mPos[1])
+            # only set the hover piece if the square under the mouse is a playable square
+            if gPos is not None:
+                # only set hover if that square contains a player whose turn it is
+                square = self.game.gridPos(gPos[0], gPos[1], True)
+                if square is not None and square[0] == self.game.redTurn:
+                    self.hoverSquare = gPos
+            else:
+                self.hoverSquare = None
+
+    def handleMouseUp(self):
+        """
+        This method is run every time pygame detects a mouse button up
+        """
+        # if there is not a selected square, then select the hovered square
+        if self.selectedSquare is None:
+            self.selectSquare()
+            if self.selectedSquare is not None:
+                self.calculateMoves(self.selectedSquare)
+        # if the is a selected square, multiple things can happen
+        else:
+            # if the hover square is nothing, then unselect the square
+            # can only move to places where the hover square is not finding a piece
+            if self.hoverSquare is None:
+                # select the move to play, based on the mouse location
+                if self.playMoves is not None and self.selectedSquare is not None:
+                    # find the square in the grid, based on the mouse position
+                    mPos = pygame.mouse.get_pos()
+                    gPos = self.mouseToGrid(mPos[0], mPos[1])
+                    # if the square is on the grid, see if a move exists there
+                    if gPos is not None:
+                        # iterate through all possible moves
+                        for i, p in enumerate(self.playMoves):
+                            if p is not None:
+                                # determine the directions of moving
+                                bins = moveIntToBoolList(i)
+
+                                # if the turn is in the opposite direction from red's perspective,
+                                #   then the square must be reversed to get black's perspective
+                                s = self.selectedSquare
+                                if not self.game.redTurn:
+                                    s = self.game.oppositeGrid(s)
+                                # make the move the square it matches the one from the mouse
+                                if gPos == p:
+                                    self.game.play(s[0], s[1], bins[0], bins[1], bins[2])
+
+                self.unselectSquare()
+            # if there is a hovered square, select that square, and calculate the moves the square can use
+            else:
+                self.selectSquare()
+                if self.selectedSquare is not None:
+                    self.calculateMoves(self.selectedSquare)
+
+    def handleKeyUp(self, event):
+        """
+        This method is run every time pygame detects a key on the keyboard has been released
+        :param event: The pygame event object from the keypress
+        """
+        if event.key == pygame.K_r:
+            self.game.resetGame()
+            self.unselectSquare()
+        elif event.key == pygame.K_ESCAPE:
+            self.running = False
+
+    def unselectSquare(self):
+        """
+        Takes the current square and sets it as no longer selected
+        """
+        self.selectedSquare = None
+        self.playMoves = None
+        self.captureMoves = None
+
+    def selectSquare(self):
+        """
+        Set the selected square to the hover square
+        """
+        if self.game.win == E_PLAYING:
+            self.selectedSquare = self.hoverSquare
+
+    def calculateMoves(self, s):
+        """
+        Given the grid coordinates of a square, determine the list of moves that can be played by that piece.
+        The result is stored in playMoves
+        :param s: The coordinates of a square
+        """
+        # find the playable moves
+        self.playMoves = []
+
+        # if the turn is in the opposite direction from red's perspective,
+        #   then the square must be reversed to get black's perspective
+        s = s if self.game.redTurn else self.game.oppositeGrid(s)
+
+        moves = self.game.calculateMoves(s)
+        # need to switch the moves around to be from the red perspective if it is black's turn
+        for m in moves:
+            if m is None or self.game.redTurn:
+                self.playMoves.append(m)
+            else:
+                self.playMoves.append(self.game.oppositeGrid(m))
+
+        # find the squares that have pieces which can be captured
+        self.captureMoves = []
+        # only consider the jumping moves, which is every odd index
+        for m in range(1, 8, 2):
+            # if the move exists, then find the square between the move and the piece position
+            move = self.playMoves[m]
+            if move is not None:
+                # if it is not red's turn, the piece needs to be inverted
+                origin = s if self.game.redTurn else self.game.oppositeGrid(s)
+                xOffset = 0 if move[1] % 2 == 1 else 1
+                self.captureMoves.append((
+                    (move[0] + origin[0]) // 2 + xOffset,
+                    (move[1] + origin[1]) // 2
+                ))
 
     def redrawPygame(self):
         """
@@ -453,28 +760,54 @@ class Gui:
                 self.drawSquare(j, i, c, True)
                 self.drawSquare(j, i, None, False)
 
+        # draw the moves that can be taken by the selected piece
+        moves = []
+        if self.playMoves is not None:
+            moves.extend(self.playMoves)
+        if self.captureMoves is not None:
+            moves.extend(self.captureMoves)
+
+        for p in moves:
+            if p is not None:
+                gridSquare = self.game.gridPos(p[0], p[1], True)
+                color = C_MOVE_HIGHLIGHT if gridSquare is None else C_CAPTURE_HIGHLIGHT
+                square = gridToBounds(p[0], p[1])
+                self.drawSquareHighlight(square, color)
+
+        # draw text at top
+        if self.game.win == E_PLAYING:
+            text = E_RED_PLAYING if self.game.redTurn else E_BLACK_PLAYING
+        else:
+            text = E_TEXT[self.game.win]
+        self.drawText(E_GAME_STATE_X, E_GAME_STATE_Y, text, E_TEXT_COLOR)
+
+        # draw extra instruction text
+        smallFont = makeFont(DR_FONT_FACE, I_FONT_SIZE)
+        smallFont.set_bold(True)
+        for i, text in enumerate(I_TEXT):
+            self.drawText(I_UP_LEFT_X, I_UP_LEFT_Y + i * I_LINE_SPACING, text, I_TEXT_COLOR, smallFont)
+
         # update display
         pygame.display.update()
 
-    def drawSquare(self, r, c, piece, offset):
+    def drawSquare(self, r, c, piece, holds):
         """
         Draw a square of the game
         :param r: The row of the square in the stored game grid
         :param c: The column of the square in the stored game grid
         :param piece: The piece on the square
-        :param offset: True if this square is one that never holds pieces, False otherwise
+        :param holds: True if this square is one that holds pieces, False otherwise
         """
         # get square coordinates
-        # TODO abstract this to a method which can be used with mouse input
-        x = DR_GRID_X + c * 2 * DR_SQUARE_SIZE
-        y = DR_GRID_Y + r * DR_SQUARE_SIZE
+        x, y = gridToMouse(c, r)
+
         # offset if appropriate
-        if not (r % 2 == 0 ^ offset):
+        if not (r % 2 == 0 ^ holds):
             x += DR_SQUARE_SIZE
 
         # draw the square
         square = (x, y, DR_SQUARE_SIZE, DR_SQUARE_SIZE)
-        pygame.draw.rect(self.gui, C_OFF_SQUARE if offset else C_ON_SQUARE, square)
+        pygame.draw.rect(self.gui, C_ON_SQUARE if holds else C_OFF_SQUARE, square)
 
         # draw the piece, if one exists
         if piece is not None:
@@ -498,14 +831,59 @@ class Gui:
 
             # if it is a king, draw a K on the circle
             if piece[1]:
-                text = self.font.render("K", False, kColor)
-                self.gui.blit(text, (square[0] + DR_PIECE_SIZE * .3, square[1] + DR_FONT_SIZE * .25))
+                self.drawText(square[0] + DR_PIECE_SIZE * .3, square[1] + DR_FONT_SIZE * .25, "K", kColor)
 
-        # if the piece is selected, then draw a highlight over it
-        if self.selectedSquare is not None and self.selectedSquare is piece:
-            highlight = pygame.Surface((square[2], square[3]), pygame.SRCALPHA)
-            pygame.draw.rect(highlight, C_PIECE_HIGHLIGHT, highlight.get_rect())
-            self.gui.blit(highlight, square)
+        # if a piece is selected, then draw an appropriate highlight over it
+        if holds:
+            if self.selectedSquare is not None and self.selectedSquare == (c, r):
+                self.drawSquareHighlight(square, C_SELECTED_HIGHLIGHT)
+            elif self.hoverSquare is not None and self.hoverSquare == (c, r):
+                self.drawSquareHighlight(square, C_HOVER_HIGHLIGHT)
+
+    def drawText(self, x, y, text, color, textFont=None):
+        """
+        Draw some text to the pygame Gui
+        :param x: The x coordinate of the text
+        :param y: The y coordinate of the text
+        :param text: The text to draw
+        :param color: The color of the text
+        :param textFont: Font to use, or None to use default
+        """
+        if textFont is None:
+            textFont = self.font
+        value = textFont.render(text, False, color)
+        self.gui.blit(value, (x, y))
+
+    def drawSquareHighlight(self, square, color):
+        """
+        Draw a highlight over a square on the Game Gui
+        :param square: The bounds of the square to draw
+        :param color: The color of the highlight, including alpha channel
+        """
+        highlight = pygame.Surface((square[2], square[3]), pygame.SRCALPHA)
+        pygame.draw.rect(highlight, color, highlight.get_rect())
+        self.gui.blit(highlight, square)
+
+    def mouseToGrid(self, x, y):
+        """
+        Given x and y coordinates on the Checkers Game Gui, get the row and column of the selected square
+        :param x: The x position of the mouse
+        :param y: The y position of the mouse
+        :return: A 2-tuple of the red side grid row and column values for the selected piece (r, c)
+            or None if no valid square was selected
+        """
+        x = int((x - (DR_PIECE_BORDER + DR_BORDER_SIZE)) / DR_SQUARE_SIZE)
+        y = int((y - (DR_PIECE_BORDER + DR_BORDER_SIZE + DR_TOP_SPACE)) / DR_SQUARE_SIZE)
+
+        evenR = y % 2 == 0
+        evenC = x % 2 == 0
+
+        x = x // 2
+
+        if evenR ^ evenC and self.game.inRange(x, y):
+            return x, y
+        else:
+            return None
 
     def stop(self):
         """
@@ -514,3 +892,49 @@ class Gui:
         """
         self.running = False
         pygame.quit()
+
+
+def gridToMouse(c, r):
+    """
+    Convert the coordinates in grid row and column to pixels in mouse coordinates
+    :param c: The column of the square to obtain
+    :param r: The row of the square to obtain
+    :return: A 2-tuple (x, y) of the pixel coordinates
+    """
+    return DR_GRID_X + c * 2 * DR_SQUARE_SIZE, DR_GRID_Y + r * DR_SQUARE_SIZE
+
+
+def gridToBounds(c, r):
+    """
+    Convert the coordinates in grid row and column to pixels bounds in mouse coordinates
+    :param c: The column of the square to obtain
+    :param r: The row of the square to obtain
+    :return: A 4-tuple (x, y, width, height) of the pixel bounds
+    """
+    x, y = gridToMouse(c, r)
+
+    # offset if appropriate
+    if r % 2 == 0:
+        x += DR_SQUARE_SIZE
+
+    # return the bounds
+    return x, y, DR_SQUARE_SIZE, DR_SQUARE_SIZE
+
+
+def moveIntToBoolList(i):
+    """
+    Convert an integer in the range [0-7] to a list of 3 boolean values, corresponding to the binary representation
+    :param i:
+    :return:
+    """
+    return [b == '1' for b in "{0:03b}".format(i)]
+
+
+def makeFont(face, size):
+    """
+    Utility method for setting font
+    :param face: The font type of the font
+    :param size: The size of the font
+    :return: the font object
+    """
+    return pygame.font.SysFont(face, size)

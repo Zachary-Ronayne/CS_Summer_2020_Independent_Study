@@ -3,12 +3,11 @@
 
 TODO:
 
-Train a neural network on the grid game
-    Find new source of slow speed in network code, probably the training and set up time
+Make model for Q learning for the checkers game
 
-    Try adding adaptive learning rate and discount rate
-
-    Add ability for player to play and train network
+Find new source of slow speed in network code, probably the training and set up time
+Try adding adaptive learning rate and discount rate
+Add ability for player to play and train network
 
 """
 
