@@ -19,7 +19,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # normal imports
 
-from Checkers import *
+from Checkers.CheckersGUI import *
 
 
 # center pygame window
@@ -31,7 +31,7 @@ game = Game(8)
 pEnv = PieceEnvironment(game, current=None)
 
 model = Network(8, pEnv)
-# print(pEnv.playGame(model))
+print(pEnv.playGame(model))
 
 gui = Gui(game, printFPS=False, qObjects=(pEnv, model))
 gui.loop()

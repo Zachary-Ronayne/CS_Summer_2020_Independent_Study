@@ -343,6 +343,22 @@ class Environment:
         :param action: The action to take
         """
 
+    @abc.abstractmethod
+    def canTakeAction(self, action):
+        """
+        Determine if the given action can be taken, based on the current state of the Environment
+        :param action: The action trying to be taken
+        :return: True if the action can be taken, False otherwise
+        """
+
+    @abc.abstractmethod
+    def performAction(self, qModel):
+        """
+        Using the given QModel, perform an action in this environment
+        :param qModel: The QModel to use
+        :return:
+        """
+
 
 class DummyGame(Environment):
 
@@ -506,11 +522,6 @@ class DummyGame(Environment):
         return self.rewards[self.gridP(x, y)] - MOVE_COST
 
     def canTakeAction(self, action):
-        """
-        Determine if the given action can be taken, based on the current state of the game
-        :param action: The action trying to be taken
-        :return: True if the action can be taken, False otherwise, the DO_NOTHING action always returns false
-        """
         canMove = not (
                 action == CANT_MOVE or
                 (action == UP and self.y < 1) or
@@ -539,6 +550,10 @@ class DummyGame(Environment):
 
         else:
             return canMove
+
+    def performAction(self, qModel):
+        action = qModel.chooseAction(self.currentState(), takeAction=self.canTakeAction)
+        self.takeAction(action)
 
     def reset(self):
         """
