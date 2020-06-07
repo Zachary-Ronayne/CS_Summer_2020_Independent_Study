@@ -35,7 +35,7 @@ ENABLE_DO_NOTHING = False
 TRACK_MOVE_HISTORY = True
 
 # used to stop importing TensorFlow, should only be used for testing, should be False in any full version
-USE_TENSOR_FLOW = True
+USE_TENSOR_FLOW = False
 
 # used to stop importing Pygame, should only be used for testing, should be False in any full version
 USE_PY_GAME = True

@@ -71,6 +71,41 @@ C_HOVER_HIGHLIGHT = (0, 0, 230, 50)
 C_MOVE_HIGHLIGHT = (0, 200, 0, 127)
 C_CAPTURE_HIGHLIGHT = (200, 0, 0, 127)
 
+# constants for Q Learning models
+Q_GAME_NUM_GRIDS = 4
+
+Q_PIECE_NUM_GRIDS = 6
+Q_PIECE_NUM_ACTIONS = 8
+
+# TODO this may need to be defined in a better way
+Q_PIECE_ID_MOVE = 0
+Q_PIECE_ID_CAPTURE = 1
+Q_PIECE_ID_CAPTURED = 2
+Q_PIECE_ID_KING = 3
+Q_PIECE_ID_KINGED = 4
+Q_PIECE_ID_WIN = 5
+Q_PIECE_ID_LOSE = 6
+Q_PIECE_ID_DRAW = 7
+
+Q_PIECE_REWARD_MOVE = 1
+Q_PIECE_REWARD_CAPTURE = 10
+Q_PIECE_REWARD_CAPTURED = -5
+Q_PIECE_REWARD_KING = 5
+Q_PIECE_REWARD_KINGED = -2
+Q_PIECE_REWARD_WIN = 100
+Q_PIECE_REWARD_LOSE = -200
+Q_PIECE_REWARD_DRAW = -50
+Q_PIECE_REWARDS = [
+    Q_PIECE_REWARD_MOVE,
+    Q_PIECE_REWARD_CAPTURE,
+    Q_PIECE_REWARD_CAPTURED,
+    Q_PIECE_REWARD_KING,
+    Q_PIECE_REWARD_KINGED,
+    Q_PIECE_REWARD_WIN,
+    Q_PIECE_REWARD_LOSE,
+    Q_PIECE_REWARD_DRAW
+]
+
 
 class Game:
     """
@@ -188,6 +223,20 @@ class Game:
         """
         x, y = p
         return self.width - 1 - x, self.height - 1 - y
+
+    def currentGrid(self):
+        """
+        Get the game board from the perspective of the current player's turn
+        :return The grid
+        """
+        return self.redGrid if self.redTurn else self.blackGrid
+
+    def area(self):
+        """
+        Get the total number of squares in the stored game grid
+        :return: The area
+        """
+        return self.width * self.height
 
     def spot(self, x, y, value, red):
         """
@@ -330,11 +379,6 @@ class Game:
         if not self.win == E_PLAYING:
             return
 
-        # if too many moves have happened with no captures, the game is a draw
-        if self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
-            self.win = E_DRAW
-            return
-
         # see if no one can make any moves
         noMoves = True
         self.redTurn = not self.redTurn
@@ -368,6 +412,9 @@ class Game:
             self.win = E_BLACK_WIN
         elif self.blackLeft == 0:
             self.win = E_RED_WIN
+        # if too many moves have happened with no captures, the game is a draw
+        elif self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
+            self.win = E_DRAW
         else:
             self.win = E_PLAYING
 
@@ -473,56 +520,135 @@ def movePos(x, y, left, forward, jump):
 
 class PieceEnvironment(Environment):
     """
-    An Environment used to determine where a piece should move to
+    An Environment used to determine where a piece should move to.
+    This Environment is incompatible with a QTable.
+    This environment considers the move they take, and the next opponent move when determining rewards
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, game, current=None):
+        """
+        Create a new Environment for determining which move a given piece should move
+        :param game: The Checkers Game that the piece will exist
+        :param current: A 2-tuple of the current grid coordinates of the piece that this Environment should control
+            Default None, must be set to a valid tuple in order to use this Environment.
+            The coordinates must be at a spot with a piece, otherwise this Environment will not work
+        """
+        self.game = game
+        self.current = current
 
     def stateSize(self):
-        return 0
+        # 6 times the grid area, 1 grid for each piece type:
+        #   ally normal, ally king, enemy normal, enemy king, controlled normal, controlled king
+        return self.game.area() * Q_PIECE_NUM_GRIDS
 
     def toState(self):
-        return np.zeros((1, 0))
+        states = np.zeros((1, self.stateSize()), dtype=np.int)
+        g = self.game
+
+        size = g.area()
+        grid = g.currentGrid()
+
+        for j, r in enumerate(grid):
+            for i, c in enumerate(r):
+                # only proceed if a piece exists
+                if c is not None:
+                    # if the piece is an ally
+                    if c[0]:
+                        # if the piece is the one selected by Environment
+                        # TODO should pieces controlled by the Environment be marked in their respective sections
+                        #   or should they be separate, so should a normal piece being controlled be marked in
+                        #   the normal index, and the controlled index
+                        if (i, j) == self.current:
+                            index = 5 if c[1] else 4
+                        # if it's a normal piece
+                        else:
+                            index = 1 if c[1] else 0
+                    else:
+                        index = 3 if c[1] else 2
+                    states[0][index * size + j * g.width + i] = 1
+
+        return states
 
     def currentState(self):
-        return 0
+        raise TypeError("This Environment is incompatible with the QModel being used")
 
     def numStates(self):
-        return 0
+        return self.stateSize()
 
     def rewardFunc(self, s, a):
+        # TODO determine reward for taking the given action
+
+        # TODO determine the punishment received for the other player making a move
+        #   OR? Do the punishments come from the other player making a move?
+        #   So find the reward and punishment for both sides, and apply both of them?
+
         return 0
 
     def takeAction(self, action):
-        return 0
+        bins = moveIntToBoolList(action)
+        c = self.current
+        self.game.play(c[0], c[1], bins[0], bins[1], bins[2])
+        # TODO does there need to be an exception here if the move fails to play?
 
 
 class GameEnvironment(Environment):
     """
-    An Environment used to determine which piece in a Game should vbe moved
+    An Environment used to determine which piece in a Game should be moved
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, game, pieceEnv):
+        """
+        Create a new Environment for determining which piece should move in a given Checkers Game
+        :param game: The Checkers Game that the piece will exist
+        :param pieceEnv: The PieceEnvironment used for determining rewards for which piece to move
+        """
+        self.game = game
+        self.pieceEnv = pieceEnv
 
     def stateSize(self):
-        return 0
+        return self.game.area() * Q_GAME_NUM_GRIDS
 
     def toState(self):
-        return np.zeros((1, 0))
+        states = np.zeros((1, self.stateSize()), dtype=np.int)
+        g = self.game
+
+        size = g.area()
+        grid = g.currentGrid()
+
+        # TODO abstract these loops away so that one method can be used for both Environments?
+        for j, r in enumerate(grid):
+            for i, c in enumerate(r):
+                # only proceed if a piece exists
+                if c is not None:
+                    # if the piece is an ally
+                    if c[0]:
+                        index = 1 if c[1] else 0
+                    else:
+                        index = 3 if c[1] else 2
+                    states[0][index * size + j * g.width + i] = 1
+        return states
 
     def currentState(self):
-        return 0
+        raise TypeError("This Environment is incompatible with the QModel being used")
 
     def numStates(self):
-        return 0
+        return self.stateSize()
 
     def rewardFunc(self, s, a):
-        return 0
+        # TODO determine the piece to use? Or is that done automatically from calls to takeAction?
+        #   so should this method call to takeAction be moved?
+        self.takeAction(a)
+
+        # TODO is this correct?
+        return self.pieceEnv.rewardFunc(s, a)
 
     def takeAction(self, action):
-        return 0
+        # convert the action into coordinates for a piece to move
+        # TODO is this the correct coordinates?
+        self.pieceEnv.current = (
+                action % self.game.width,
+                action // self.game.height
+        )
 
 
 class Gui:

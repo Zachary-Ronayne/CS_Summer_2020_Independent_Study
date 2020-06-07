@@ -4,6 +4,8 @@
 TODO:
 
 Make model for Q learning for the checkers game
+Rework the game so that it takes tuples for the moves and positions in play()
+    Also make it easier to convert between moves as an integer in range[0,7] to a list of 3 booleans
 
 Find new source of slow speed in network code, probably the training and set up time
 Try adding adaptive learning rate and discount rate
@@ -25,8 +27,13 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 # make game
 game = Game(8)
-gui = Gui(game, printFPS=False)
-gui.loop()
+
+pEnv = PieceEnvironment(game, current=(0, 7))
+gEnv = GameEnvironment(game, pEnv)
+
+
+# gui = Gui(game, printFPS=False)
+# gui.loop()
 
 # create a grid
 """

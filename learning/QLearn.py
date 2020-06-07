@@ -340,9 +340,7 @@ class Environment:
         """
         Take the given action in the environment
         :param action: The action to take
-        :return The reward type for taking that action
         """
-        return 0
 
 
 class DummyGame(Environment):
@@ -447,7 +445,6 @@ class DummyGame(Environment):
 
         if oldX == self.x and oldY == self.y:
             return CANT_MOVE
-        return self.gridP(self.x, self.y)
 
     def stateSize(self):
         return 5 * self.width() * self.height()
