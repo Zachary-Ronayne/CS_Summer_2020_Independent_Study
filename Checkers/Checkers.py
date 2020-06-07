@@ -501,6 +501,7 @@ class PieceEnvironment(Environment):
         """
         Create a new Environment for determining which move a given piece should move
         :param game: The Checkers Game that the piece will exist
+
         :param current: A 2-tuple of the current grid coordinates of the piece that this Environment should control
             Default None, must be set to a valid tuple in order to use this Environment.
             The coordinates must be at a spot with a piece, otherwise this Environment will not work
@@ -656,12 +657,17 @@ class GameEnvironment(Environment):
         return self.stateSize()
 
     def rewardFunc(self, s, a):
-        # TODO determine the piece to use? Or is that done automatically from calls to takeAction?
-        #   so should this method call to takeAction be moved?
-        # self.takeAction(a)
+        pos = self.actionToPos(a)
 
-        # TODO is this correct? Specifically the action probably needs to be converted to a PieceEnvironment action
-        return self.pieceEnv.rewardFunc(s, a)
+        # Take all possible actions from pos, and return the one with the highest Q value
+        actions = self.game.calculateMoves(pos)
+        high = None
+        for act in actions:
+            if act is not None:
+                reward = self.pieceEnv.rewardFunc(s, act)
+                if high is None or high < reward:
+                    high = reward
+        return 0 if high is None else high
 
     def canTakeAction(self, action):
         x, y = self.actionToPos(action)

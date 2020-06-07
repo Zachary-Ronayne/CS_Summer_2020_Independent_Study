@@ -31,7 +31,7 @@ game = Game(8)
 pEnv = PieceEnvironment(game, current=None)
 
 model = Network(8, pEnv)
-print(pEnv.playGame(model))
+# print(pEnv.playGame(model))
 
 gui = Gui(game, printFPS=False, qObjects=(pEnv, model))
 gui.loop()

@@ -226,11 +226,11 @@ class Gui:
         :return True if a move was successfully made, False otherwise
         """
         if self.qModel is None or self.qEnv is None:
-            return True
+            return False
 
         self.qEnv.performAction(self.qModel)
 
-        return False
+        return True
 
     def unselectSquare(self):
         """
