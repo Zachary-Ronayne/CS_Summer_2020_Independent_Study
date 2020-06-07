@@ -173,8 +173,9 @@ class Network(QModel):
             and potential reward. This environment determines the number of states used by the network
         :param inner: The inner layers of the Network, None to have no inner layers, default None.
             Should only be positive integers
-        :param learnRate: The learning rate of the table
-        :param discountRate: The discount rate of the table
+        :param learnRate: The learning rate of the Network
+        :param discountRate: The discount rate of the Network
+        :param explorationRate: The probability that a random action will be taken, rather than the optimal one
         """
         super().__init__(environment.numStates(), actions, environment, learnRate, discountRate, explorationRate)
 

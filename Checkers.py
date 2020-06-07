@@ -5,6 +5,10 @@ if USE_PY_GAME:
 
 import time
 
+import traceback
+
+# TODO separate this into multiple files
+
 # technical constants
 ENABLE_LOOP_WAIT = False
 
@@ -48,10 +52,11 @@ DR_FONT_FACE = "Arial"
 # constants for instruction text at the top
 I_FONT_SIZE = 20
 I_UP_LEFT_X = 10
-I_UP_LEFT_Y = 70
-I_LINE_SPACING = 25
+I_UP_LEFT_Y = 60
+I_LINE_SPACING = 22
 I_TEXT = [
     "R: reset game",
+    "A: make AI move",
     "ESC: close game"
 ]
 I_TEXT_COLOR = (0, 0, 0)
@@ -445,6 +450,18 @@ class Game:
                 playMoves.append(None)
         return playMoves
 
+    def canMovePos(self, pos):
+        """
+        Determine if a piece at a given grid position has any moves
+        :param pos: The grid position
+        :return: True if a piece at that position has at least one move, False otherwise
+        """
+        moves = self.calculateMoves(pos)
+        for m in moves:
+            if m is not None:
+                return True
+        return False
+
     def validPiece(self, x, y, forward):
         """
         Given a piece, determine if the piece is valid to move.
@@ -533,15 +550,25 @@ class PieceEnvironment(Environment):
     This environment considers the move they take, and the next opponent move when determining rewards
     """
 
-    def __init__(self, game, current=None):
+    def __init__(self, game, current=None, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
         Create a new Environment for determining which move a given piece should move
         :param game: The Checkers Game that the piece will exist
         :param current: A 2-tuple of the current grid coordinates of the piece that this Environment should control
             Default None, must be set to a valid tuple in order to use this Environment.
             The coordinates must be at a spot with a piece, otherwise this Environment will not work
+        :param inner: The inner layers of the Network used for controlling the game, None to have no inner layers,
+            default None.  Should only be positive integers
+        :param learnRate: The learning rate of the Network, for the Network used for controlling the game
+        :param discountRate: The discount rate of the Network, for the Network used for controlling the game
+        :param explorationRate: The probability that a random action will be taken, rather than the optimal one,
+            for the Network used for controlling the game
         """
         self.game = game
+        self.gameEnv = GameEnvironment(self.game, self)
+        self.gameNetwork = Network(self.game.area(), self.gameEnv,
+                                   inner=[] if inner is None else inner,
+                                   learnRate=learnRate, discountRate=discountRate, explorationRate=explorationRate)
         self.current = current
 
     def stateSize(self):
@@ -592,27 +619,28 @@ class PieceEnvironment(Environment):
 
         return 0
 
+    # TODO better way of abstracting out canTakeAction, should be able to just have a parameterless method that
+    #   makes a move in the environment
     def canTakeAction(self, action):
         """
         Determine if a given action can be taken
         :param action: The action to take
         :return: True if the action can be taken, False otherwise
         """
-        # TODO add function that makes some actions not able to happen depending on the state
-        #   do this for both environments
-        return True
+        return self.game.canPlay(self.current, moveIntToBoolList(action))
 
     def takeAction(self, action):
+
         bins = moveIntToBoolList(action)
         c = self.current
-        self.game.play(c[0], c[1], bins[0], bins[1], bins[2])
+        self.game.play(c, bins)
         # TODO does there need to be an exception here if the move fails to play?
 
     def playGame(self, qModel):
         """
         Play one game of checkers, and train the given Q model as it plays
         :param qModel: The QModel to train with this method
-        :return: The total reward from playing the game
+        :return: A 2-tuple, (total, moves), the total reward from playing the game, and number of moves in the game
         """
 
         # TODO abstract some of this playGame code away so that it can more generally be used in models
@@ -620,20 +648,27 @@ class PieceEnvironment(Environment):
         self.game.resetGame()
 
         total = 0
+        moves = 0
         while self.game.win == E_PLAYING:
             state = 0
+            # TODO abstract the next 2 lines away
+            action = self.gameNetwork.chooseAction(state, takeAction=self.gameEnv.canTakeAction)
+            self.gameEnv.takeAction(action)
             action = qModel.chooseAction(state, takeAction=self.canTakeAction)
-            self.takeAction(action)
 
             if action is None:
                 # TODO
                 print("Testing, this should never appear, implement a proper response")
+                traceback.print_stack()
+                break
             else:
+                self.takeAction(action)
                 qModel.train(state, action, takeAction=self.canTakeAction)
 
             total += self.rewardFunc(state, action)
+            moves += 1
 
-        return total
+        return total, moves
 
 
 class GameEnvironment(Environment):
@@ -645,7 +680,7 @@ class GameEnvironment(Environment):
         """
         Create a new Environment for determining which piece should move in a given Checkers Game
         :param game: The Checkers Game that the piece will exist
-        :param pieceEnv: The PieceEnvironment used for determining rewards for which piece to move
+        :param pieceEnv: The PieceEnvironment used by this GameEnvironment
         """
         self.game = game
         self.pieceEnv = pieceEnv
@@ -684,16 +719,29 @@ class GameEnvironment(Environment):
         #   so should this method call to takeAction be moved?
         self.takeAction(a)
 
-        # TODO is this correct?
+        # TODO is this correct? Specifically the action probably needs to be converted to a PieceEnvironment action
         return self.pieceEnv.rewardFunc(s, a)
+
+    def canTakeAction(self, action):
+        """
+        Determine if moving a piece, represented by the given action, can be moved
+        :param action: The action representing coordinates of a piece
+        :return: True if the action can take place, False otherwise
+        """
+        x, y = self.actionToPos(action)
+        return self.game.canMovePos((x, y))
+
+    def actionToPos(self, action):
+        """
+        Convert an action in the range [0, game.area() - 1] to a grid position
+        :param action: The action
+        :return: A 2-tuple (x, y) of the position
+        """
+        return action % self.game.width, action // self.game.width
 
     def takeAction(self, action):
         # convert the action into coordinates for a piece to move
-        # TODO is this the correct coordinates?
-        self.pieceEnv.current = (
-                action % self.game.width,
-                action // self.game.height
-        )
+        self.pieceEnv.current = self.actionToPos(action)
 
 
 class Gui:
@@ -701,15 +749,17 @@ class Gui:
     A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
     """
 
-    def __init__(self, game, fps=20, printFPS=False):
+    def __init__(self, game, fps=20, printFPS=False, qObjects=None):
         """
         Create and display the pygame Gui with the given game.
         Must call loop() to make the Gui stay open
         :param game: The Checkers Game object to use with this Gui
         :param fps: The capped frame rate of the Gui, default 20
         :param printFPS: True to print the frames per second, every second, False otherwise, default False
+        :param qObjects: A 2-tuple (environment, qModel) to use for making an AI move
         """
         self.game = game
+        self.qEnv, self.qModel = qObjects
 
         # setup pygame
         pygame.init()
@@ -856,6 +906,24 @@ class Gui:
             self.unselectSquare()
         elif event.key == pygame.K_ESCAPE:
             self.running = False
+        elif event.key == pygame.K_a:
+            if self.makeQModelMove():
+                self.unselectSquare()
+
+    def makeQModelMove(self):
+        """
+        Make the next move in the game with the current QModel. Does nothing if that QModel is None
+        :return True if a move was successfully made, False otherwise
+        """
+        if self.qModel is None or self.qEnv is None:
+            return True
+
+        # TODO abstract the next 2 lines away
+        a = self.qEnv.gameNetwork.chooseAction(0, takeAction=self.qEnv.gameEnv.canTakeAction)
+        self.qEnv.gameEnv.takeAction(a)
+        self.qEnv.takeAction(self.qModel.chooseAction(0, self.qEnv.canTakeAction))
+
+        return False
 
     def unselectSquare(self):
         """

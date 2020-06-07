@@ -28,13 +28,12 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 # make game
 game = Game(8)
 
-pEnv = PieceEnvironment(game, current=(0, 7))
-gEnv = GameEnvironment(game, pEnv)
+pEnv = PieceEnvironment(game, current=None)
 
 model = Network(8, pEnv)
-# pEnv.playGame(model)
+# print(pEnv.playGame(model))
 
-gui = Gui(game, printFPS=False)
+gui = Gui(game, printFPS=False, qObjects=(pEnv, model))
 gui.loop()
 
 # create a grid
