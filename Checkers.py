@@ -291,24 +291,28 @@ class Game:
         else:
             return self.blackGrid[y][x]
 
-    def play(self, x, y, left, forward, jump):
+    def play(self, pos, modifiers):
         """
         Progress the game by one move. This is the method that should be called when a player makes a full move.
         The movement is always based on the player of the current turn.
         Red moves first.
-        :param x: The x coordinate of the piece to move
-        :param y: The y coordinate of the piece to move
-        :param left: True to move left, False to move Right
-        :param forward: True to move forward, False to move backwards
-        :param jump: True if this move is a jump, False if it is a normal move
+        :param pos: A 2-tuple (x, y) of positive integers the grid coordinates of the piece to move
+        :param modifiers: A list of booleans, (left, forward, jump)
+            left: True to move left, False to move Right
+            forward: True to move forward, False to move backwards
+            jump: True if this move is a jump, False if it is a normal move
         :return: True if it is now the other players turn, False otherwise
         """
+
+        x, y = pos
+        left, forward, jump = modifiers
+
         # cannot play at all if the game is not playing
         if not self.win == E_PLAYING:
             return False
 
-        if self.canPlay(x, y, left, forward, jump):
-            newX, newY = movePos(x, y, left, forward, jump)
+        if self.canPlay(pos, modifiers):
+            newX, newY = movePos(pos, modifiers)
 
             newPiece = self.gridPos(x, y, self.redTurn)
 
@@ -321,7 +325,7 @@ class Game:
             # a capture has happened
             if jump:
                 self.movesSinceLastCapture = 0
-                jX, jY = movePos(x, y, left, forward, False)
+                jX, jY = movePos(pos, [left, forward, False])
                 self.spot(jX, jY, None, self.redTurn)
 
             # update number of moves
@@ -338,32 +342,33 @@ class Game:
             self.redTurn = not self.redTurn
         return changeTurns
 
-    def canPlay(self, x, y, left, forward, jump):
+    def canPlay(self, pos, modifiers):
         """
         Determine if a move can be made in the game.
         The move is based on the current turn of the game, ie. if red is moving,
             then the coordinates are from red's perspective
-        :param x: The x coordinate of the piece to move, it is assumed the coordinate is in bounds of the grid
-        :param y: The y coordinate of the piece to move, it is assumed the coordinate is in bounds of the grid
-        :param left: True if the piece is moving to diagonally left, False for diagonally right
-        :param forward: True if the piece is moving forward, relative to that sides direction,
-            False to move backwards, only happens if kings can do it
-        :param jump: True if this move is a jump, False if it is a normal move
+        :param pos: A 2-tuple (x, y) of positive integers the grid coordinates of the piece to move
+        :param modifiers: A list of 3 booleans, (left, forward, jump)
+            left: True to move left, False to move Right
+            forward: True to move forward, False to move backwards
+            jump: True if this move is a jump, False if it is a normal move
         :return True if the piece can make the move, False otherwise
         """
+        x, y = pos
+        left, forward, jump = modifiers
 
         if not self.validPiece(x, y, forward):
             return False
 
         # determine directions
-        newX, newY = movePos(x, y, left, forward, jump)
+        newX, newY = movePos(pos, modifiers)
 
         # check to see if movement for the new coordinate is in bounds
         if not self.inRange(newX, newY):
             return False
         # check if the piece jumped over is an enemy
         if jump:
-            jX, jY = movePos(x, y, left, forward, False)
+            jX, jY = movePos(pos, [left, forward, False])
             pos = self.gridPos(jX, jY, self.redTurn)
             if pos is None or pos[0]:
                 return False
@@ -406,12 +411,12 @@ class Game:
         # if black has no pieces, red wins
         # if red has no pieces, black wins
         # if no one has any pieces, or no one can move, it's a draw
-        if (self.redLeft == 0 and self.blackLeft == 0) or noMoves:
-            self.win = E_DRAW
-        elif self.redLeft == 0:
+        if self.redLeft == 0:
             self.win = E_BLACK_WIN
         elif self.blackLeft == 0:
             self.win = E_RED_WIN
+        elif (self.redLeft == 0 and self.blackLeft == 0) or noMoves:
+            self.win = E_DRAW
         # if too many moves have happened with no captures, the game is a draw
         elif self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
             self.win = E_DRAW
@@ -432,9 +437,9 @@ class Game:
         for i in range(8):
             bins = moveIntToBoolList(i)
             # check if the move can be played
-            if self.canPlay(s[0], s[1], bins[0], bins[1], bins[2]):
+            if self.canPlay(s, bins):
                 # determine the position of the move
-                move = movePos(s[0], s[1], bins[0], bins[1], bins[2])
+                move = movePos(s, bins)
                 playMoves.append(move)
             else:
                 playMoves.append(None)
@@ -486,19 +491,22 @@ def pieceString(piece):
     return "".join(text)
 
 
-def movePos(x, y, left, forward, jump):
+def movePos(pos, modifiers):
     """
     Determine the coordinates of a new move
     The move is based on the current turn of the game, ie. if red is moving,
         then the coordinates are from red's perspective
-    :param x: The x coordinate of the piece to move, it is assumed the coordinate is in bounds of the grid
-    :param y: The y coordinate of the piece to move, it is assumed the coordinate is in bounds of the grid
-    :param left: True if the piece is moving to diagonally left, False for diagonally right
-    :param forward: True if the piece is moving forward, relative to that sides direction,
-        False to move backwards, only happens if kings can do it
-    :param jump: True if this move is a jump, False otherwise
+    :param pos: A 2-tuple (x, y) of positive integers the grid coordinates of the piece to move
+    :param modifiers: A list of booleans, (left, forward, jump)
+        left: True to move left, False to move Right
+        forward: True to move forward, False to move backwards
+        jump: True if this move is a jump, False if it is a normal move
     :return The coordinates of the location of the new move, as a 2-tuple (x, y)
     """
+
+    x, y = pos
+    left, forward, jump = modifiers
+
     if jump:
         # determine direction for y axis
         newY = y - 2 if forward else y + 2
@@ -584,11 +592,48 @@ class PieceEnvironment(Environment):
 
         return 0
 
+    def canTakeAction(self, action):
+        """
+        Determine if a given action can be taken
+        :param action: The action to take
+        :return: True if the action can be taken, False otherwise
+        """
+        # TODO add function that makes some actions not able to happen depending on the state
+        #   do this for both environments
+        return True
+
     def takeAction(self, action):
         bins = moveIntToBoolList(action)
         c = self.current
         self.game.play(c[0], c[1], bins[0], bins[1], bins[2])
         # TODO does there need to be an exception here if the move fails to play?
+
+    def playGame(self, qModel):
+        """
+        Play one game of checkers, and train the given Q model as it plays
+        :param qModel: The QModel to train with this method
+        :return: The total reward from playing the game
+        """
+
+        # TODO abstract some of this playGame code away so that it can more generally be used in models
+
+        self.game.resetGame()
+
+        total = 0
+        while self.game.win == E_PLAYING:
+            state = 0
+            action = qModel.chooseAction(state, takeAction=self.canTakeAction)
+            self.takeAction(action)
+
+            if action is None:
+                # TODO
+                print("Testing, this should never appear, implement a proper response")
+            else:
+                qModel.train(state, action, takeAction=self.canTakeAction)
+
+            total += self.rewardFunc(state, action)
+
+        return total
 
 
 class GameEnvironment(Environment):
@@ -792,7 +837,7 @@ class Gui:
                                     s = self.game.oppositeGrid(s)
                                 # make the move the square it matches the one from the mouse
                                 if gPos == p:
-                                    self.game.play(s[0], s[1], bins[0], bins[1], bins[2])
+                                    self.game.play(s, bins)
 
                 self.unselectSquare()
             # if there is a hovered square, select that square, and calculate the moves the square can use

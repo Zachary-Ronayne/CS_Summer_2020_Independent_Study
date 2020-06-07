@@ -31,9 +31,11 @@ game = Game(8)
 pEnv = PieceEnvironment(game, current=(0, 7))
 gEnv = GameEnvironment(game, pEnv)
 
+model = Network(8, pEnv)
+# pEnv.playGame(model)
 
-# gui = Gui(game, printFPS=False)
-# gui.loop()
+gui = Gui(game, printFPS=False)
+gui.loop()
 
 # create a grid
 """
