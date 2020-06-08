@@ -177,7 +177,7 @@ class Network(QModel):
         :param discountRate: The discount rate of the Network
         :param explorationRate: The probability that a random action will be taken, rather than the optimal one
         """
-        super().__init__(environment.numStates(), actions, environment, learnRate, discountRate, explorationRate)
+        super().__init__(environment.stateSize(), actions, environment, learnRate, discountRate, explorationRate)
 
         if inner is None:
             inner = []

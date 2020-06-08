@@ -28,17 +28,21 @@ Q_PIECE_NUM_ACTIONS = 8
 
 # TODO this may need to be defined in a better way
 Q_PIECE_ID_MOVE = 0
-Q_PIECE_ID_CAPTURE = 1
-Q_PIECE_ID_CAPTURED = 2
-Q_PIECE_ID_KING = 3
-Q_PIECE_ID_KINGED = 4
-Q_PIECE_ID_WIN = 5
-Q_PIECE_ID_LOSE = 6
-Q_PIECE_ID_DRAW = 7
+Q_PIECE_ID_N_CAPTURE = 1
+Q_PIECE_ID_K_CAPTURE = 2
+Q_PIECE_ID_N_CAPTURED = 3
+Q_PIECE_ID_K_CAPTURED = 4
+Q_PIECE_ID_KING = 5
+Q_PIECE_ID_KINGED = 6
+Q_PIECE_ID_WIN = 7
+Q_PIECE_ID_LOSE = 8
+Q_PIECE_ID_DRAW = 9
 
 Q_PIECE_REWARD_MOVE = 1
-Q_PIECE_REWARD_CAPTURE = 10
-Q_PIECE_REWARD_CAPTURED = -5
+Q_PIECE_REWARD_N_CAPTURE = 8
+Q_PIECE_REWARD_K_CAPTURE = 12
+Q_PIECE_REWARD_N_CAPTURED = -3
+Q_PIECE_REWARD_K_CAPTURED = -6
 Q_PIECE_REWARD_KING = 5
 Q_PIECE_REWARD_KINGED = -2
 Q_PIECE_REWARD_WIN = 100
@@ -46,8 +50,10 @@ Q_PIECE_REWARD_LOSE = -200
 Q_PIECE_REWARD_DRAW = -50
 Q_PIECE_REWARDS = [
     Q_PIECE_REWARD_MOVE,
-    Q_PIECE_REWARD_CAPTURE,
-    Q_PIECE_REWARD_CAPTURED,
+    Q_PIECE_REWARD_N_CAPTURE,
+    Q_PIECE_REWARD_K_CAPTURE,
+    Q_PIECE_REWARD_N_CAPTURED,
+    Q_PIECE_REWARD_K_CAPTURED,
     Q_PIECE_REWARD_KING,
     Q_PIECE_REWARD_KINGED,
     Q_PIECE_REWARD_WIN,
@@ -148,6 +154,9 @@ class Game:
         # list to track all text
         text = ["Red's turn"] if self.redTurn else ["Black's Turn"]
 
+        # show labels for which side is from which perspective
+        text.append("Black Side" if red else "Red Side")
+
         # iterate through each row
         for j, r in enumerate(self.redGrid):
             # list to track row text
@@ -164,6 +173,10 @@ class Game:
                     row.append(P_EMPTY)
             # combine the text into a row
             text.append("".join(row))
+
+        # show labels for which side is from which perspective
+        text.append("Red Side" if red else "Black Side")
+
         # return the final result
         return "\n".join(text)
 
@@ -525,32 +538,60 @@ class PieceEnvironment(Environment):
         return self.game.area() * Q_PIECE_NUM_GRIDS
 
     def toState(self):
+        # states = np.zeros((1, self.stateSize()), dtype=np.int)
+        # g = self.game
+        #
+        # size = g.area()
+        # grid = g.currentGrid()
+        #
+        # for j, r in enumerate(grid):
+        #     for i, c in enumerate(r):
+        #         # only proceed if a piece exists
+        #         if c is not None:
+        #             # if the piece is an ally
+        #             if c[0]:
+        #                 # if the piece is the one selected by Environment
+        #                 if (i, j) == self.current:
+        #                     index = 5 if c[1] else 4
+        #                 # if it's a normal piece
+        #                 else:
+        #                     index = 1 if c[1] else 0
+        #             else:
+        #                 index = 3 if c[1] else 2
+        #             states[0][index * size + j * g.width + i] = 1
+        #
+        # return states
+
+        # TODO is this right?
+        state = self.currentState()
         states = np.zeros((1, self.stateSize()), dtype=np.int)
         g = self.game
-
         size = g.area()
-        grid = g.currentGrid()
-
-        for j, r in enumerate(grid):
-            for i, c in enumerate(r):
-                # only proceed if a piece exists
-                if c is not None:
-                    # if the piece is an ally
-                    if c[0]:
-                        # if the piece is the one selected by Environment
-                        if (i, j) == self.current:
-                            index = 5 if c[1] else 4
-                        # if it's a normal piece
-                        else:
-                            index = 1 if c[1] else 0
+        for i, s in enumerate(state):
+            x, y = self.gameEnv.actionToPos(i)
+            if s is not None:
+                # if the piece is an ally
+                if s[0]:
+                    # if the piece is the one selected by Environment
+                    if (x, y) == self.current:
+                        index = 5 if s[1] else 4
+                    # if it's a normal piece
                     else:
-                        index = 3 if c[1] else 2
-                    states[0][index * size + j * g.width + i] = 1
-
+                        index = 1 if s[1] else 0
+                else:
+                    index = 3 if s[1] else 2
+                states[0][index * size + y * g.width + x] = 1
         return states
 
     def currentState(self):
-        raise TypeError("This Environment is incompatible with the QModel being used")
+        grid = self.game.currentGrid()
+        vals = []
+        # TODO make this code efficient
+        for r in grid:
+            for c in r:
+                vals.append(c)
+
+        return vals
 
     def numStates(self):
         return self.stateSize()
@@ -562,7 +603,63 @@ class PieceEnvironment(Environment):
         #   OR? Do the punishments come from the other player making a move?
         #   So find the reward and punishment for both sides, and apply both of them?
 
-        return 0
+        totalReward = 0
+
+        bins = moveIntToBoolList(a)
+        newPos = movePos(self.current, bins)
+
+        # if it's a jump, add capture reward for appropriate piece
+        if bins[2]:
+            capturedPos = movePos(self.current, (bins[0], bins[1], False))
+            captured = self.stateToPiece(s, capturedPos)
+            totalReward += Q_PIECE_REWARD_K_CAPTURE if captured[1] else Q_PIECE_REWARD_N_CAPTURE
+
+        # otherwise, add move reward
+        else:
+            totalReward += Q_PIECE_REWARD_MOVE
+
+        # if it lands on the end, add king reward
+        if newPos[1] == 0:
+            totalReward += Q_PIECE_REWARD_KING
+
+        # if the game ends
+        #   in a win, add win reward
+        #   in a draw, add draw reward
+        #   in a loss, add loss reward
+
+        # calculate reward for the enemy move?
+        #   this should be from the perspective of the opponent
+        #   assuming they take the same action that this environment would?
+        #   So how to know what the next move would be?
+
+        # take the given action, in a copy of the game?
+        #   will want to minimize calls to this function then
+
+        # if piece is kinged, add kinged punishment
+
+        # if a piece is captured, add captured punishment for appropriate piece
+
+        # if the game ends
+        #   in a win, add win reward
+        #   in a draw, add draw reward
+        #   in a loss, add loss reward
+
+        return totalReward
+
+    def stateToPiece(self, s, pos):
+        """
+        Given a state, and coordinates, obtain the piece located on that position
+        :param s: The state
+        :param pos: A 2-tuple (x, y) of the position coordinate on the grid
+        :return: The place on the grid, either None for empty square, or a 2-tuple of (ally, king)
+        """
+
+        x, y = pos
+        piece = s[x + y * self.game.width]
+        if piece is None:
+            return None
+
+        return piece
 
     def canTakeAction(self, action):
         return self.game.canPlay(self.current, moveIntToBoolList(action))
@@ -573,14 +670,15 @@ class PieceEnvironment(Environment):
         self.game.play(c, bins)
 
     def performAction(self, qModel):
-        action = self.gameNetwork.chooseAction(0, takeAction=self.gameEnv.canTakeAction)
+        action = self.gameNetwork.chooseAction(self.currentState(), takeAction=self.gameEnv.canTakeAction)
         self.gameEnv.takeAction(action)
-        self.takeAction(qModel.chooseAction(0, self.canTakeAction))
+        self.takeAction(qModel.chooseAction(self.currentState(), self.canTakeAction))
 
-    def playGame(self, qModel):
+    def playGame(self, qModel, printReward=False):
         """
         Play one game of checkers, and train the given Q model as it plays
         :param qModel: The QModel to train with this method
+        :param printReward: True to print the reward obtained each time a move is made, False otherwise, default False
         :return: A 2-tuple, (total, moves), the total reward from playing the game, and number of moves in the game
         """
 
@@ -591,10 +689,12 @@ class PieceEnvironment(Environment):
 
         # play the game until it's over
         while self.game.win == E_PLAYING:
-            state = 0
 
             # select a piece for the AI to play
             self.gameEnv.performAction(self.gameNetwork)
+
+            # get the current state
+            state = self.currentState()
 
             # determine the action for that piece to take
             action = qModel.chooseAction(state, takeAction=self.canTakeAction)
@@ -605,7 +705,10 @@ class PieceEnvironment(Environment):
             # otherwise, perform the action by training with it
             else:
                 # find the reward for the action
-                total += self.rewardFunc(state, action)
+                reward = self.rewardFunc(state, action)
+                if printReward:
+                    print("Reward this turn: " + str(reward))
+                total += reward
                 qModel.train(state, action, takeAction=self.canTakeAction)
 
                 # keep track of the total moves made

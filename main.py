@@ -4,12 +4,17 @@
 TODO:
 
 Make model for Q learning for the checkers game
-Rework the game so that it takes tuples for the moves and positions in play()
-    Also make it easier to convert between moves as an integer in range[0,7] to a list of 3 booleans
 
 Find new source of slow speed in network code, probably the training and set up time
 Try adding adaptive learning rate and discount rate
 Add ability for player to play and train network
+
+Try making the checkers game use a normal state system
+    Each possible orientation of the game board results in a unique state
+    So consider every place can have ally normal and king, enemy normal and king,
+        and in the PieceEnvironment, also one number for having a controlled normal or king
+
+Make the binary list of modifiers easier to read, like have a converter method that returns the correct modifier
 
 """
 
@@ -26,12 +31,16 @@ from Checkers.CheckersGUI import *
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 # make game
-game = Game(8)
+game = Game(6)
 
 pEnv = PieceEnvironment(game, current=None)
 
-model = Network(8, pEnv)
-# print(pEnv.playGame(model))
+model = Network(8, pEnv, inner=[], learnRate=0.1, explorationRate=0.1, discountRate=0.5)
+for i in range(10):
+    print("Game: " + str(i))
+    print("Reward and total moves" + str(pEnv.playGame(model, printReward=False)))
+
+game.resetGame()
 
 gui = Gui(game, printFPS=False, qObjects=(pEnv, model))
 gui.loop()
