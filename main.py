@@ -31,18 +31,26 @@ from Checkers.CheckersGUI import *
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 # make game
-game = Game(6)
+game = Game(4)
 
 pEnv = PieceEnvironment(game, current=None)
+model = pEnv.internalNetwork
+model.learnRate = 0.1
+model.explorationRate = 0.1
+model.discountRate = 0.5
 
-model = Network(8, pEnv, inner=[], learnRate=0.1, explorationRate=0.1, discountRate=0.5)
+gameModel = pEnv.gameNetwork
+gameModel.learnRate = 0.1
+gameModel.explorationRate = 0.1
+gameModel.discountRate = 0.5
+
 for i in range(10):
     print("Game: " + str(i))
-    print("Reward and total moves" + str(pEnv.playGame(model, printReward=False)))
+    print("Reward and total moves" + str(pEnv.playGame(printReward=False)))
 
 game.resetGame()
 
-gui = Gui(game, printFPS=False, qObjects=(pEnv, model))
+gui = Gui(game, printFPS=False, qObject=pEnv)
 gui.loop()
 
 # create a grid

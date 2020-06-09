@@ -279,7 +279,8 @@ class Network(QModel):
 
     def getActions(self, s):
         # get the actions
-        actions = self.getOutputs()
+        # TODO should this be s, or rework what is sent to getActions()?
+        actions = self.net.predict(s, verbose=0)
         # convert the actions to a list
         return [a for a in actions[0]]
 

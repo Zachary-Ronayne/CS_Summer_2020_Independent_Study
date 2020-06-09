@@ -1,5 +1,7 @@
 from learning.QLearn import *
 
+import copy
+
 # constants for ending game
 E_PLAYING = 0
 E_RED_WIN = 1
@@ -144,6 +146,16 @@ class Game:
             for x in range(self.width):
                 yy = self.height - 1 - y
                 self.spot(x, yy, None, True)
+
+    def setBoard(self, pieceList, red):
+        """
+        Set the values of all the grid spaces in this Game
+        :param pieceList: A 1D list of piece values, None or a 2-tuple (ally, king)
+        :param red: True if the pieces come from red's perspective, False otherwise
+        """
+        for i, c in enumerate(pieceList):
+            x, y = i % self.width, i // self.width
+            self.spot(x, y, c, red)
 
     def string(self, red):
         """
@@ -510,7 +522,7 @@ class PieceEnvironment(Environment):
     This environment considers the move they take, and the next opponent move when determining rewards
     """
 
-    def __init__(self, game, current=None, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, game, current=None, gameInner=None, pieceInner=None):
         """
         Create a new Environment for determining which move a given piece should move
         :param game: The Checkers Game that the piece will exist
@@ -518,18 +530,19 @@ class PieceEnvironment(Environment):
         :param current: A 2-tuple of the current grid coordinates of the piece that this Environment should control
             Default None, must be set to a valid tuple in order to use this Environment.
             The coordinates must be at a spot with a piece, otherwise this Environment will not work
-        :param inner: The inner layers of the Network used for controlling the game, None to have no inner layers,
-            default None.  Should only be positive integers
-        :param learnRate: The learning rate of the Network, for the Network used for controlling the game
-        :param discountRate: The discount rate of the Network, for the Network used for controlling the game
-        :param explorationRate: The probability that a random action will be taken, rather than the optimal one,
-            for the Network used for controlling the game
+        :param pieceInner: The inner layers of the Network used for controlling the piece movement,
+            None to have no inner layers, default None. Should only be positive integers
+        :param gameInner: The inner layers of the Network used for controlling the piece selection,
+            None to have no inner layers, default None.  Should only be positive integers
         """
         self.game = game
         self.gameEnv = GameEnvironment(self.game, self)
         self.gameNetwork = Network(self.game.area(), self.gameEnv,
-                                   inner=[] if inner is None else inner,
-                                   learnRate=learnRate, discountRate=discountRate, explorationRate=explorationRate)
+                                   inner=[] if gameInner is None else gameInner)
+
+        self.internalNetwork = Network(Q_PIECE_NUM_ACTIONS, self,
+                                       inner=[] if pieceInner is None else pieceInner)
+
         self.current = current
 
     def stateSize(self):
@@ -584,6 +597,7 @@ class PieceEnvironment(Environment):
         return states
 
     def currentState(self):
+        # TODO better define the difference between currentState() and toState()
         grid = self.game.currentGrid()
         vals = []
         # TODO make this code efficient
@@ -597,20 +611,20 @@ class PieceEnvironment(Environment):
         return self.stateSize()
 
     def rewardFunc(self, s, a):
-        # TODO determine reward for taking the given action
-
-        # TODO determine the punishment received for the other player making a move
-        #   OR? Do the punishments come from the other player making a move?
-        #   So find the reward and punishment for both sides, and apply both of them?
-
         totalReward = 0
 
-        bins = moveIntToBoolList(a)
-        newPos = movePos(self.current, bins)
+        # determine the modifiers for the given action
+        modifiers = moveIntToBoolList(a)
+
+        # determine the new location after the action is taken
+        newPos = movePos(self.current, modifiers)
+
+        # get the position of the piece to move
+        piecePos = self.current
 
         # if it's a jump, add capture reward for appropriate piece
-        if bins[2]:
-            capturedPos = movePos(self.current, (bins[0], bins[1], False))
+        if modifiers[2]:
+            capturedPos = movePos(piecePos, (modifiers[0], modifiers[1], False))
             captured = self.stateToPiece(s, capturedPos)
             totalReward += Q_PIECE_REWARD_K_CAPTURE if captured[1] else Q_PIECE_REWARD_N_CAPTURE
 
@@ -622,27 +636,58 @@ class PieceEnvironment(Environment):
         if newPos[1] == 0:
             totalReward += Q_PIECE_REWARD_KING
 
-        # if the game ends
+        # make the move in a copy of the game
+        # TODO find a way to avoid using deepcopy, or maybe your own copy method
+        turn = self.game.redTurn
+        newGame = copy.deepcopy(self.game)
+        newGame.play(piecePos, modifiers)
+
+        # if the game ends, it will be a win or a draw
         #   in a win, add win reward
         #   in a draw, add draw reward
-        #   in a loss, add loss reward
+        if newGame.win == E_DRAW:
+            return totalReward + Q_PIECE_REWARD_DRAW
+        elif turn and newGame.win == E_RED_WIN or not turn and newGame.win == E_BLACK_WIN:
+            return totalReward + Q_PIECE_REWARD_WIN
 
+        # TODO determine remaining rewards
         # calculate reward for the enemy move?
         #   this should be from the perspective of the opponent
         #   assuming they take the same action that this environment would?
         #   So how to know what the next move would be?
 
-        # take the given action, in a copy of the game?
-        #   will want to minimize calls to this function then
+        # determine which enemy piece will move
+        # TODO
+        # save the old game and current values
+        oldGame = self.game
+        self.game = newGame
+        oldCurrent = piecePos
+
+        # determine the direction that piece will move
+        # TODO
+        self.gameEnv.performAction(self.gameNetwork)
+        piecePos = self.current
 
         # if piece is kinged, add kinged punishment
+        # TODO
 
         # if a piece is captured, add captured punishment for appropriate piece
+        # TODO
+
+        # make the enemy move
+        # self.game.play(self.current, modifiers)
 
         # if the game ends
-        #   in a win, add win reward
         #   in a draw, add draw reward
         #   in a loss, add loss reward
+        if self.game.win == E_DRAW:
+            return totalReward + Q_PIECE_REWARD_DRAW
+        elif turn and self.game.win == E_BLACK_WIN or not turn and self.game.win == E_RED_WIN:
+            return totalReward + Q_PIECE_REWARD_LOSE
+
+        # put the game object back to normal
+        self.game = oldGame
+        self.current = oldCurrent
 
         return totalReward
 
@@ -670,14 +715,12 @@ class PieceEnvironment(Environment):
         self.game.play(c, bins)
 
     def performAction(self, qModel):
-        action = self.gameNetwork.chooseAction(self.currentState(), takeAction=self.gameEnv.canTakeAction)
-        self.gameEnv.takeAction(action)
-        self.takeAction(qModel.chooseAction(self.currentState(), self.canTakeAction))
+        self.gameEnv.performAction(self.gameNetwork)
+        self.takeAction(qModel.chooseAction(self.toState(), self.canTakeAction))
 
-    def playGame(self, qModel, printReward=False):
+    def playGame(self, printReward=False):
         """
-        Play one game of checkers, and train the given Q model as it plays
-        :param qModel: The QModel to train with this method
+        Play one game of checkers, and train the Q model stored in this environment
         :param printReward: True to print the reward obtained each time a move is made, False otherwise, default False
         :return: A 2-tuple, (total, moves), the total reward from playing the game, and number of moves in the game
         """
@@ -694,10 +737,12 @@ class PieceEnvironment(Environment):
             self.gameEnv.performAction(self.gameNetwork)
 
             # get the current state
+            # TODO should this be toState() or currentState()?
             state = self.currentState()
 
             # determine the action for that piece to take
-            action = qModel.chooseAction(state, takeAction=self.canTakeAction)
+            # TODO should this be toState() or currentState()?
+            action = self.internalNetwork.chooseAction(self.toState(), takeAction=self.canTakeAction)
 
             # if no action is found, then the game is over, end the game
             if action is None:
@@ -709,7 +754,7 @@ class PieceEnvironment(Environment):
                 if printReward:
                     print("Reward this turn: " + str(reward))
                 total += reward
-                qModel.train(state, action, takeAction=self.canTakeAction)
+                self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
 
                 # keep track of the total moves made
                 moves += 1
@@ -735,26 +780,31 @@ class GameEnvironment(Environment):
         return self.game.area() * Q_GAME_NUM_GRIDS
 
     def toState(self):
+        state = self.currentState()
         states = np.zeros((1, self.stateSize()), dtype=np.int)
         g = self.game
-
         size = g.area()
-        grid = g.currentGrid()
-
-        for j, r in enumerate(grid):
-            for i, c in enumerate(r):
-                # only proceed if a piece exists
-                if c is not None:
-                    # if the piece is an ally
-                    if c[0]:
-                        index = 1 if c[1] else 0
-                    else:
-                        index = 3 if c[1] else 2
-                    states[0][index * size + j * g.width + i] = 1
+        for i, s in enumerate(state):
+            x, y = self.actionToPos(i)
+            if s is not None:
+                # if the piece is an ally
+                if s[0]:
+                    index = 1 if s[1] else 0
+                else:
+                    index = 3 if s[1] else 2
+                states[0][index * size + y * g.width + x] = 1
         return states
 
     def currentState(self):
-        raise TypeError("This Environment is incompatible with the QModel being used")
+        # TODO abstract this code away so that both the Environments can use it
+        grid = self.game.currentGrid()
+        vals = []
+        # TODO make this code efficient
+        for r in grid:
+            for c in r:
+                vals.append(c)
+
+        return vals
 
     def numStates(self):
         return self.stateSize()
@@ -777,7 +827,8 @@ class GameEnvironment(Environment):
         return self.game.canMovePos((x, y))
 
     def performAction(self, qModel):
-        action = qModel.chooseAction(0, self.canTakeAction)
+        # TODO this should be changed to current state, not 0
+        action = qModel.chooseAction(self.toState(), self.canTakeAction)
         self.takeAction(action)
 
     def actionToPos(self, action):

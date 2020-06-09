@@ -59,17 +59,17 @@ class Gui:
     A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
     """
 
-    def __init__(self, game, fps=20, printFPS=False, qObjects=None):
+    def __init__(self, game, fps=20, printFPS=False, qObject=None):
         """
         Create and display the pygame Gui with the given game.
         Must call loop() to make the Gui stay open
         :param game: The Checkers Game object to use with this Gui
         :param fps: The capped frame rate of the Gui, default 20
         :param printFPS: True to print the frames per second, every second, False otherwise, default False
-        :param qObjects: A 2-tuple (environment, qModel) to use for making an AI move
+        :param qObject: A 2-tuple (environment, qModel) to use for making an AI move
         """
         self.game = game
-        self.qEnv, self.qModel = qObjects
+        self.qEnv = qObject
 
         # setup pygame
         pygame.init()
@@ -225,10 +225,11 @@ class Gui:
         Make the next move in the game with the current QModel. Does nothing if that QModel is None
         :return True if a move was successfully made, False otherwise
         """
-        if self.qModel is None or self.qEnv is None:
+        model = self.qEnv.internalNetwork
+        if model is None or self.qEnv is None:
             return False
 
-        self.qEnv.performAction(self.qModel)
+        self.qEnv.performAction(model)
 
         return True
 
