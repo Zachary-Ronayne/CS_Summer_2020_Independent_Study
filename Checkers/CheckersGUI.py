@@ -1,4 +1,4 @@
-from Checkers.Checkers import *
+from Checkers.Environments import *
 
 if USE_PY_GAME:
     import pygame
@@ -59,17 +59,16 @@ class Gui:
     A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
     """
 
-    def __init__(self, game, fps=20, printFPS=False, qObject=None):
+    def __init__(self, qObject, fps=20, printFPS=False):
         """
         Create and display the pygame Gui with the given game.
         Must call loop() to make the Gui stay open
-        :param game: The Checkers Game object to use with this Gui
+        :param qObject: The PieceEnvironment object to use for making an AI move, the Game object also comes from here
         :param fps: The capped frame rate of the Gui, default 20
         :param printFPS: True to print the frames per second, every second, False otherwise, default False
-        :param qObject: A 2-tuple (environment, qModel) to use for making an AI move
         """
-        self.game = game
         self.qEnv = qObject
+        self.game = qObject.game
 
         # setup pygame
         pygame.init()

@@ -275,11 +275,10 @@ class Network(QModel):
         :return: The inputs as a numpy array to be fed into the network. All elements are 0,
             except for the element of the current state, which is 1
         """
-        return self.environment.toState()
+        return self.environment.toNetInput()
 
     def getActions(self, s):
         # get the actions
-        # TODO should this be s, or rework what is sent to getActions()?
         actions = self.net.predict(s, verbose=0)
         # convert the actions to a list
         return [a for a in actions[0]]
@@ -304,7 +303,7 @@ class Environment:
         return 0
 
     @abc.abstractmethod
-    def toState(self):
+    def toNetInput(self):
         """
         Convert the model into a 1D numpy array that can be fed into a network as inputs
         :return: the inputs
@@ -467,7 +466,7 @@ class DummyGame(Environment):
     def stateSize(self):
         return 5 * self.width() * self.height()
 
-    def toState(self):
+    def toNetInput(self):
         if self.sizeStates:
             inputs = np.zeros((1, self.numStates()))
             inputs[0][self.currentState()] = 1

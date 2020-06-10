@@ -9,12 +9,11 @@ Find new source of slow speed in network code, probably the training and set up 
 Try adding adaptive learning rate and discount rate
 Add ability for player to play and train network
 
-Try making the checkers game use a normal state system
-    Each possible orientation of the game board results in a unique state
-    So consider every place can have ally normal and king, enemy normal and king,
-        and in the PieceEnvironment, also one number for having a controlled normal or king
+Make the total reward for a game also dependent on the total number of moves taken
+    More moves means less reward
+    Basically subtract the number of moves from the reward
 
-Make the binary list of modifiers easier to read, like have a converter method that returns the correct modifier
+Try using convolutional layers
 
 """
 
@@ -30,8 +29,9 @@ from Checkers.CheckersGUI import *
 # center pygame window
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
+
 # make game
-game = Game(4)
+game = Game(8)
 
 pEnv = PieceEnvironment(game, current=None)
 model = pEnv.internalNetwork
@@ -44,14 +44,17 @@ gameModel.learnRate = 0.1
 gameModel.explorationRate = 0.1
 gameModel.discountRate = 0.5
 
-for i in range(10):
+for i in range(1):
+    currentTime = time.time()
     print("Game: " + str(i))
     print("Reward and total moves" + str(pEnv.playGame(printReward=False)))
+    print("took:", time.time() - currentTime, "seconds")
 
 game.resetGame()
 
-gui = Gui(game, printFPS=False, qObject=pEnv)
+gui = Gui(pEnv, printFPS=False)
 gui.loop()
+
 
 # create a grid
 """

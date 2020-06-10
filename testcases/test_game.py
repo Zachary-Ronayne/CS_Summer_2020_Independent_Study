@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from Checkers.Checkers import Game
+from Checkers.Environments import Game
 
 
 class TestGame(TestCase):
