@@ -1,4 +1,5 @@
-from Checkers.Environments import *
+from Checkers.Game import *
+from Constants import *
 
 if USE_PY_GAME:
     import pygame
@@ -18,7 +19,7 @@ E_GAME_STATE_Y = 10
 DR_SQUARE_SIZE = 80
 DR_BORDER_SIZE = 20
 DR_GAME_BORDER_SIZE = 5
-DR_TOP_SPACE = 120
+DR_TOP_SPACE = 140
 DR_GRID_X = DR_BORDER_SIZE + DR_GAME_BORDER_SIZE
 DR_GRID_Y = DR_BORDER_SIZE + DR_TOP_SPACE + DR_GAME_BORDER_SIZE
 DR_PIECE_SIZE = 70
@@ -27,13 +28,15 @@ DR_FONT_SIZE = 50
 DR_FONT_FACE = "Arial"
 
 # constants for instruction text at the top
-I_FONT_SIZE = 20
+I_FONT_SIZE = 17
 I_UP_LEFT_X = 10
 I_UP_LEFT_Y = 60
-I_LINE_SPACING = 22
+I_LINE_SPACING = 19
 I_TEXT = [
     "R: reset game",
     "A: make AI move",
+    "T: make AI move and train",
+    "S: save the current state of the model",
     "ESC: close game"
 ]
 I_TEXT_COLOR = (0, 0, 0)
@@ -176,6 +179,7 @@ class Gui:
             # if the hover square is nothing, then unselect the square
             # can only move to places where the hover square is not finding a piece
             if self.hoverSquare is None:
+                # TODO may want to move some of this code
                 # select the move to play, based on the mouse location
                 if self.playMoves is not None and self.selectedSquare is not None:
                     # find the square in the grid, based on the mouse position
@@ -210,25 +214,35 @@ class Gui:
         This method is run every time pygame detects a key on the keyboard has been released
         :param event: The pygame event object from the keypress
         """
-        if event.key == pygame.K_r:
+        k = event.key
+        if k == pygame.K_r:
             self.game.resetGame()
             self.unselectSquare()
-        elif event.key == pygame.K_ESCAPE:
+        elif k == pygame.K_ESCAPE:
             self.running = False
-        elif event.key == pygame.K_a:
+        elif k == pygame.K_a:
             if self.makeQModelMove():
                 self.unselectSquare()
+        elif k == pygame.K_t:
+            if self.makeQModelMove(True):
+                self.unselectSquare()
+        elif k == pygame.K_s:
+            self.qEnv.saveNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-    def makeQModelMove(self):
+    def makeQModelMove(self, train=False):
         """
         Make the next move in the game with the current QModel. Does nothing if that QModel is None
+        :param train: True to also train the network with this move, False otherwise, default False
         :return True if a move was successfully made, False otherwise
         """
         model = self.qEnv.internalNetwork
         if model is None or self.qEnv is None:
             return False
 
-        self.qEnv.performAction(model)
+        if train:
+            self.qEnv.trainMove()
+        else:
+            self.qEnv.performAction(model)
 
         return True
 

@@ -3,11 +3,8 @@
 
 TODO:
 
-Make model for Q learning for the checkers game
-
 Find new source of slow speed in network code, probably the training and set up time
 Try adding adaptive learning rate and discount rate
-Add ability for player to play and train network
 
 Make the total reward for a game also dependent on the total number of moves taken
     More moves means less reward
@@ -22,13 +19,15 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # normal imports
-
-from Checkers.CheckersGUI import *
-
+from Checkers.Gui import *
+from Checkers.Environments import *
 
 # center pygame window
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
+
+# for loading in or not loading in the saved version of the Networks
+loadModel = True
 
 # make game
 game = Game(8)
@@ -44,7 +43,10 @@ gameModel.learnRate = 0.1
 gameModel.explorationRate = 0.1
 gameModel.discountRate = 0.5
 
-for i in range(1):
+if loadModel:
+    pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
+
+for i in range(0):
     currentTime = time.time()
     print("Game: " + str(i))
     print("Reward and total moves" + str(pEnv.playGame(printReward=False)))

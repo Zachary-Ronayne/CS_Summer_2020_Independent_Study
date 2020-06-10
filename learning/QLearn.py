@@ -477,7 +477,6 @@ class DummyGame(Environment):
             size = self.width() * self.height()
 
             # there are NUM_ACTIONS possibilities for each grid position
-            # TODO see about adding player coordinates
             for c in range(NUM_REWARD_SQUARES):
                 # go through each row
                 for i, y in enumerate(self.grid):

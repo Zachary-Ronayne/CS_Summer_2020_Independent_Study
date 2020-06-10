@@ -1,5 +1,10 @@
 from learning.QLearn import *
 from Checkers.Game import *
+if USE_TENSOR_FLOW:
+    from tensorflow.keras.models import load_model
+
+import os.path as path
+import os
 
 # constants for Q Learning models
 Q_GAME_NUM_GRIDS = 4
@@ -78,30 +83,7 @@ class PieceEnvironment(Environment):
         return self.game.area() * Q_PIECE_NUM_GRIDS
 
     def toNetInput(self):
-        # get the state of the environment
-        state = self.currentState()
-
-        # set up an array which can be fed into a network
-        states = np.zeros((1, self.stateSize()), dtype=np.int)
-        g = self.game
-        size = g.area()
-        # go through each element in the state, and set the input array position, corresponding to the
-        #   index of the state and condition of the state
-        for i, s in enumerate(state):
-            x, y = self.gameEnv.game.singlePos(i)
-            if s is not None:
-                # if the piece is an ally
-                if s[0]:
-                    # if the piece is the one selected by Environment
-                    if (x, y) == self.current:
-                        index = 5 if s[1] else 4
-                    # if it's a normal piece
-                    else:
-                        index = 1 if s[1] else 0
-                else:
-                    index = 3 if s[1] else 2
-                states[0][index * size + y * g.width + x] = 1
-        return states
+        return gameToNetInput(self.game, self.current)
 
     def currentState(self):
         return self.game.toList()
@@ -110,7 +92,6 @@ class PieceEnvironment(Environment):
         return self.stateSize()
 
     def rewardFunc(self, s, a):
-        # TODO make a better way of this than saving the original game objects
         oldGame = self.game
 
         totalReward = 0
@@ -145,7 +126,6 @@ class PieceEnvironment(Environment):
 
         # determine which enemy piece will move
         # save the old game and current values
-        # TODO make a better way of this than saving the original game objects
         self.game = newGame
         self.gameEnv.game = newGame
         oldCurrent = piecePos
@@ -233,14 +213,23 @@ class PieceEnvironment(Environment):
         return self.game.canPlay(self.current, moveIntToBoolList(action))
 
     def takeAction(self, action):
-        bins = moveIntToBoolList(action)
-        c = self.current
-        self.game.play(c, bins)
+        if action is not None:
+            bins = moveIntToBoolList(action)
+            c = self.current
+            self.game.play(c, bins)
 
     def performAction(self, qModel):
-        # TODO handle case when an action of None is found
         self.gameEnv.performAction(self.gameNetwork)
         self.takeAction(qModel.chooseAction(self.toNetInput(), self.canTakeAction))
+
+    def trainMove(self):
+        """
+        Make a move in the game, and train the network based on that move
+        """
+        self.gameEnv.performAction(self.gameNetwork)
+        state = self.currentState()
+        action = self.internalNetwork.chooseAction(self.toNetInput(), takeAction=self.canTakeAction)
+        self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
 
     def playGame(self, printReward=False):
         """
@@ -285,6 +274,37 @@ class PieceEnvironment(Environment):
 
         return total, moves
 
+    def saveNetworks(self, pieceName, networkName):
+        """
+        Save both of the QNetwork models used by this PieceEnvironment.
+        Files are saved relative to Constants.NETWORK_SAVES
+        :param pieceName: The file name for the internalNetwork
+        :param networkName: The file name for the gameNetwork
+        :return True if the files were saved, False otherwise
+        """
+
+        if not path.isdir(NETWORK_SAVES):
+            os.mkdir(NETWORK_SAVES)
+        self.internalNetwork.net.save(NETWORK_SAVES + "/" + pieceName)
+        self.gameNetwork.net.save(NETWORK_SAVES + "/" + networkName)
+
+        return True
+
+    def loadNetworks(self, pieceName, networkName):
+        """
+        Load in both of the QNetwork models used by this PieceEnvironment.
+        Files are saved relative to Constants.NETWORK_SAVES
+        :param pieceName: The file name for the internalNetwork
+        :param networkName: The file name for the gameNetwork
+        :return True if the files were loaded, False otherwise
+        """
+        try:
+            self.internalNetwork.net = load_model(NETWORK_SAVES + "/" + pieceName)
+            self.gameNetwork.net = load_model(NETWORK_SAVES + "/" + networkName)
+            return True
+        except (ImportError, IOError, OSError):
+            return False
+
 
 class GameEnvironment(Environment):
     """
@@ -304,20 +324,7 @@ class GameEnvironment(Environment):
         return self.game.area() * Q_GAME_NUM_GRIDS
 
     def toNetInput(self):
-        state = self.currentState()
-        states = np.zeros((1, self.stateSize()), dtype=np.int)
-        g = self.game
-        size = g.area()
-        for i, s in enumerate(state):
-            x, y = self.game.singlePos(i)
-            if s is not None:
-                # if the piece is an ally
-                if s[0]:
-                    index = 1 if s[1] else 0
-                else:
-                    index = 3 if s[1] else 2
-                states[0][index * size + y * g.width + x] = 1
-        return states
+        return gameToNetInput(self.game, None)
 
     def currentState(self):
         return self.game.toList()
@@ -343,10 +350,45 @@ class GameEnvironment(Environment):
         return self.game.canMovePos((x, y))
 
     def performAction(self, qModel):
-        # TODO handle case when an action of None is found
         action = qModel.chooseAction(self.toNetInput(), self.canTakeAction)
         self.takeAction(action)
 
     def takeAction(self, action):
         # convert the action into coordinates for a piece to move
-        self.pieceEnv.current = self.game.singlePos(action)
+        if action is not None:
+            self.pieceEnv.current = self.game.singlePos(action)
+
+
+def gameToNetInput(g, current):
+    """
+    Convert a Checkers Game object into a numpy array used for input of a Network for PieceEnvironment
+    :param g: The Game object
+    :param current: A 2-tuple (x, y) of the location of the piece that will be moved next.
+        None to not include the grids representing controlled pieces
+    :return: The numpy array
+    """
+
+    # get the state of the environment
+    state = g.toList()
+
+    # set up an array which can be fed into a network
+    size = g.area()
+    gridCount = Q_GAME_NUM_GRIDS if current is None else Q_PIECE_NUM_GRIDS
+    states = np.zeros((1, size * gridCount), dtype=np.int)
+    # go through each element in the state, and set the input array position, corresponding to the
+    #   index of the state and condition of the state
+    for i, s in enumerate(state):
+        x, y = g.singlePos(i)
+        if s is not None:
+            # if the piece is an ally
+            if s[0]:
+                # if the piece is the one selected by Environment
+                if current is not None and (x, y) == current:
+                    index = 5 if s[1] else 4
+                # if it's a normal piece
+                else:
+                    index = 1 if s[1] else 0
+            else:
+                index = 3 if s[1] else 2
+            states[0][index * size + y * g.width + x] = 1
+    return states

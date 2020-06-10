@@ -39,3 +39,8 @@ USE_TENSOR_FLOW = True
 
 # used to stop importing Pygame, should only be used for testing, should be False in any full version
 USE_PY_GAME = True
+
+# used for saving neural Networks
+NETWORK_SAVES = "saves"
+PIECE_NETWORK_NAME = "piece"
+GAME_NETWORK_NAME = "game"
