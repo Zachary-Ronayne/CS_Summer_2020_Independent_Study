@@ -177,7 +177,7 @@ class Network(QModel):
         :param discountRate: The discount rate of the Network
         :param explorationRate: The probability that a random action will be taken, rather than the optimal one
         """
-        super().__init__(environment.stateSize(), actions, environment, learnRate, discountRate, explorationRate)
+        super().__init__(environment.networkInputs(), actions, environment, learnRate, discountRate, explorationRate)
 
         if inner is None:
             inner = []
@@ -295,7 +295,7 @@ class Environment:
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def stateSize(self):
+    def networkInputs(self):
         """
         Get the number of values used for input for a network
         :return: The number of values
@@ -463,7 +463,7 @@ class DummyGame(Environment):
         if oldX == self.x and oldY == self.y:
             return CANT_MOVE
 
-    def stateSize(self):
+    def networkInputs(self):
         return 5 * self.width() * self.height()
 
     def toNetInput(self):
@@ -473,7 +473,7 @@ class DummyGame(Environment):
             return inputs
         else:
             # create an array of appropriate size
-            arr = np.zeros((1, self.stateSize()))
+            arr = np.zeros((1, self.networkInputs()))
             size = self.width() * self.height()
 
             # there are NUM_ACTIONS possibilities for each grid position

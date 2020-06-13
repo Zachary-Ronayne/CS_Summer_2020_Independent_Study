@@ -3,20 +3,29 @@
 
 TODO:
 
+Make test cases
+
 Find new source of slow speed in network code, probably the training and set up time
 Try adding adaptive learning rate and discount rate
-
-Make the total reward for a game also dependent on the total number of moves taken
-    More moves means less reward
-    Basically subtract the number of moves from the reward
-
 Try using convolutional layers
 
 """
 
 # hide warnings
 import os
+# TODO hide warnings again?
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+"""
+2020-06-11 11:36:09.516806: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'cudart64_101.dll'; dlerror: cudart64_101.dll not found
+2020-06-11 11:36:09.517508: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
+2020-06-11 11:36:13.923133: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'nvcuda.dll'; dlerror: nvcuda.dll not found
+2020-06-11 11:36:13.923260: E tensorflow/stream_executor/cuda/cuda_driver.cc:313] failed call to cuInit: UNKNOWN ERROR (303)
+2020-06-11 11:36:13.927083: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:169] retrieving CUDA diagnostic information for host: DESKTOP-AGIR9UI
+2020-06-11 11:36:13.927254: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:176] hostname: DESKTOP-AGIR9UI
+2020-06-11 11:36:13.930923: I tensorflow/core/platform/cpu_feature_guard.cc:143] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2
+2020-06-11 11:36:13.965047: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x2ce45804a70 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2020-06-11 11:36:13.965201: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+"""
 
 # normal imports
 from Checkers.Gui import *
@@ -46,7 +55,7 @@ gameModel.discountRate = 0.5
 if loadModel:
     pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-for i in range(0):
+for i in range(100):
     currentTime = time.time()
     print("Game: " + str(i))
     print("Reward and total moves" + str(pEnv.playGame(printReward=False)))

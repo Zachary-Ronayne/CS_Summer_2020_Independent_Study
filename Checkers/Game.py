@@ -50,14 +50,17 @@ class Game:
         self.redTurn = None
         self.redLeft = 0
         self.blackLeft = 0
-        self.resetGame()
 
         self.win = E_PLAYING
         self.movesSinceLastCapture = 0
+        # the total number of moves made in the game so far
+        self.moves = 0
+
+        self.resetGame()
 
     def makeCopy(self):
         """
-        Get an exact copy of this game, but as a completely seperate object
+        Get an exact copy of this game, but as a completely separate object
         :return: The copy
         """
         g = Game(self.height)
@@ -67,6 +70,7 @@ class Game:
         g.blackLeft = self.blackLeft
         g.win = self.win
         g.movesSinceLastCapture = self.movesSinceLastCapture
+        g.moves = self.moves
 
         pieces = self.toList()
         g.setBoard(pieces, g.redTurn)
@@ -107,11 +111,11 @@ class Game:
 
         # reset number of moves
         self.movesSinceLastCapture = 0
+        self.moves = 0
 
     def clearBoard(self):
         """
         Clear out the entire board, making every space empty
-        :return:
         """
         for y in range(self.height):
             # fill in each spot in the row
@@ -126,7 +130,7 @@ class Game:
         :param red: True if the pieces come from red's perspective, False otherwise
         """
         for i, c in enumerate(pieceList):
-            x, y = i % self.width, i // self.width
+            x, y = self.singlePos(i)
             self.spot(x, y, c, red)
 
     def toList(self):
@@ -268,7 +272,6 @@ class Game:
         """
         Progress the game by one move. This is the method that should be called when a player makes a full move.
         The movement is always based on the player of the current turn.
-        Red moves first.
         :param pos: A 2-tuple (x, y) of positive integers the grid coordinates of the piece to move
         :param modifiers: A list of booleans, (left, forward, jump)
             left: True to move left, False to move Right
@@ -303,6 +306,7 @@ class Game:
 
             # update number of moves
             self.movesSinceLastCapture += 1
+            self.moves += 1
 
             # see if the game is over
             self.checkWinConditions()
@@ -357,6 +361,15 @@ class Game:
         if not self.win == E_PLAYING:
             return
 
+        # if black has no pieces, red wins
+        # if red has no pieces, black wins
+        if self.redLeft == 0:
+            self.win = E_BLACK_WIN
+            return
+        elif self.blackLeft == 0:
+            self.win = E_RED_WIN
+            return
+
         # see if no one can make any moves
         noMoves = True
         self.redTurn = not self.redTurn
@@ -381,17 +394,10 @@ class Game:
                 break
         self.redTurn = not self.redTurn
 
-        # if black has no pieces, red wins
-        # if red has no pieces, black wins
-        # if no one has any pieces, or no one can move, it's a draw
-        if self.redLeft == 0:
-            self.win = E_BLACK_WIN
-        elif self.blackLeft == 0:
-            self.win = E_RED_WIN
-        elif (self.redLeft == 0 and self.blackLeft == 0) or noMoves:
-            self.win = E_DRAW
-        # if too many moves have happened with no captures, the game is a draw
-        elif self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
+        # if no one can move, or if no one has any pieces, or
+        # if too many moves have happened with no captures, it's a draw
+        if noMoves or (self.redLeft == 0 and self.blackLeft == 0) or \
+                self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
             self.win = E_DRAW
         else:
             self.win = E_PLAYING
@@ -401,8 +407,7 @@ class Game:
         Given the grid coordinates of a square, determine the list of moves that can be played by that piece.
         :param s: The coordinates of a square
         :return The list of moves, a list of 8, 2-tuples, (x, y) of moves that can be taken,
-            or None if that move cannot be taken. The move index is based on binary,
-            4s place = left, 2s place = forward, 1s place = jump
+            or None if that move cannot be taken.
             Coordinates relative to the current players turn
         """
         playMoves = []
@@ -420,7 +425,7 @@ class Game:
 
     def canMovePos(self, pos):
         """
-        Determine if a piece at a given grid position has any moves
+        Determine if a piece at a given grid position has any moves for the current player
         :param pos: The grid position
         :return: True if a piece at that position has at least one move, False otherwise
         """
@@ -514,7 +519,7 @@ def movePos(pos, modifiers):
 def moveIntToBoolList(i):
     """
     Convert an integer in the range [0-7] to a list of 3 boolean values, corresponding to the binary representation
-    :param i:
-    :return:
+    :param i: The integer
+    :return: The list of 3 boolean values
     """
     return [b == '1' for b in "{0:03b}".format(i)]
