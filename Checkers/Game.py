@@ -372,27 +372,20 @@ class Game:
 
         # see if no one can make any moves
         noMoves = True
-        self.redTurn = not self.redTurn
         # iterate through rows
         for j in range(self.height):
             # iterate through the columns of each row
             for i in range(self.width):
-                # if the spot contains a piece and that piece is an ally
+                # if the spot is not empty, there might be moves
                 c = self.gridPos(i, j, self.redTurn)
-                potentialMoves = self.calculateMoves((i, j))
-                if c is not None and c[0]:
-                    # find the moves of that piece
-                    # if at least one of those moves is valid, then there are not no moves
-                    for p in potentialMoves:
-                        if p is not None:
-                            noMoves = False
-                            break
-                # break each of the outer loops if a move is found
+                if c is not None:
+                    # check if the spot piece is an ally and it has moves
+                    noMoves = not c[0] or not self.canMovePos((i, j))
+                # break out of the loops, a move has been found
                 if not noMoves:
                     break
             if not noMoves:
                 break
-        self.redTurn = not self.redTurn
 
         # if no one can move, or if no one has any pieces, or
         # if too many moves have happened with no captures, it's a draw

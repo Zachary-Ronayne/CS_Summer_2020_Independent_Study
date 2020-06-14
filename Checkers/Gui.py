@@ -227,6 +227,7 @@ class Gui:
             if self.makeQModelMove(True):
                 self.unselectSquare()
         elif k == pygame.K_s:
+            # TODO should add some kind of notification on the screen for successful or failed save
             self.qEnv.saveNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
     def makeQModelMove(self, train=False):

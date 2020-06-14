@@ -4,19 +4,15 @@ from unittest import TestCase
 class TestGameEnvironment(TestCase):
 
     def test_networkInputs(self):
-        # TODO
         pass
 
     def test_toNetInput(self):
-        # TODO
         pass
 
     def test_currentState(self):
-        # TODO
         pass
 
     def test_numStates(self):
-        # TODO
         pass
 
     def test_rewardFunc(self):

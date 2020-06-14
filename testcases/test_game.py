@@ -317,6 +317,26 @@ class TestGame(TestCase):
         game.checkWinConditions()
         self.assertEqual(game.win, E_DRAW)
 
+        # test game is a draw, it is red's turn and red has no moves,
+        #   but both red and black have pieces
+        game.resetGame()
+        game.clearBoard()
+        game.redTurn = True
+        game.spot(0, 1, (True, False), True)
+        game.spot(0, 0, (False, False), True)
+        game.checkWinConditions()
+        self.assertEqual(game.win, E_DRAW)
+
+        # test game is a draw, it is black's turn and black has no moves,
+        #   but both red and black have pieces
+        game.resetGame()
+        game.clearBoard()
+        game.redTurn = False
+        game.spot(0, 1, (True, False), False)
+        game.spot(0, 0, (False, False), False)
+        game.checkWinConditions()
+        self.assertEqual(game.win, E_DRAW)
+
         # test the game is a draw with too many moves since last capture
         game.resetGame()
         game.movesSinceLastCapture = E_MAX_MOVES_WITHOUT_CAPTURE

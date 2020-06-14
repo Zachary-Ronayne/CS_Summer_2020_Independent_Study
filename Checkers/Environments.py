@@ -40,6 +40,8 @@ Q_PIECE_REWARD_WIN = 100
 Q_PIECE_REWARD_LOSE = -200
 # reward for drawing the game
 Q_PIECE_REWARD_DRAW = -50
+# reward for the game being still in progress
+Q_PIECE_REWARD_PLAYING = 0
 # this value is multiplied by the total number of moves, and added to the reward when the game ends
 Q_PIECE_REWARD_MOVES_FACTOR = -1
 
@@ -78,6 +80,8 @@ class PieceEnvironment(Environment):
         return self.game.area() * Q_PIECE_NUM_GRIDS
 
     def toNetInput(self):
+        if self.current is None:
+            return None
         return gameToNetInput(self.game, self.current)
 
     def currentState(self):
@@ -87,11 +91,12 @@ class PieceEnvironment(Environment):
         return self.networkInputs()
 
     def rewardFunc(self, s, a):
-        # TODO reward function is probably applying the reward for losing way too often
+        # TODO reward function is applying the reward for losing way too often
         #   probably need to rework how the function gives reward,
         #   making sure it's consistent regardless of which side is played from
-        #  Sometimes the reward is like -10000, and that shouldn't normally be happening
-        #   this is probably from the checkWinConditions method not picking up on some case for when the game is over
+        #  reward for losing a game should only apply at most once per game
+        #   because once that action happens, then there can be no more rewards
+        #  It looks like the big negative numbers don't happen where there is a draw
 
         oldGame = self.game
 
@@ -104,7 +109,7 @@ class PieceEnvironment(Environment):
         piecePos = self.current
 
         # find the reward for the ally moving
-        totalReward += self.jumpReward(s, piecePos, modifiers, True)
+        totalReward += self.moveReward(s, piecePos, modifiers)
 
         # make the move in a copy of the game
         redTurn = self.game.redTurn
@@ -132,22 +137,16 @@ class PieceEnvironment(Environment):
         piecePos = self.current
 
         # determine the direction that piece will move
-        # convert the game to a state
-        newState = self.toNetInput()
         # find the actual action
-        action = self.internalNetwork.chooseAction(newState, takeAction=self.canTakeAction)
+        action = self.internalNetwork.chooseAction(self.toNetInput(), takeAction=self.canTakeAction)
         # find the modifiers for the action
 
-        # TODO find a better way to handle this case
-        if action is None:
-            totalReward = 0
-            print("Action was none in reward func")
-        else:
+        # if no action can be taken, then the game must be over, so do not take another move
+        if action is not None:
             modifiers = moveIntToBoolList(action)
 
             # add the reward for the enemy moving
-            totalReward += self.jumpReward(self.currentState(), piecePos, modifiers, False)
-
+            totalReward += self.moveReward(self.currentState(), piecePos, modifiers)
             # make the enemy move
             self.game.play(piecePos, modifiers)
 
@@ -163,17 +162,17 @@ class PieceEnvironment(Environment):
 
         return totalReward
 
-    def jumpReward(self, state, position, modifiers, ally):
+    def moveReward(self, state, position, modifiers):
         """
         Helper method for rewardFunc. Determines the amount of reward when a piece moves
         :param state: The current state of the game
         :param position: The position of the piece to move
         :param modifiers: The modifiers defining how the piece moves
-        :param ally: True if this is an ally piece moving, False otherwise
         :return: The total reward gained from moving
         """
         reward = 0
-        newPos = movePos(self.current, modifiers)
+        newPos = movePos(position, modifiers)
+        ally, king = self.stateToPiece(state, position)
 
         # if it's a jump, add capture reward for appropriate piece
         if modifiers[2]:
@@ -181,15 +180,15 @@ class PieceEnvironment(Environment):
             captured = self.stateToPiece(state, capturedPos)
             if ally:
                 reward += Q_PIECE_REWARD_K_CAPTURE if captured[1] else Q_PIECE_REWARD_N_CAPTURE
-
-            reward += Q_PIECE_REWARD_K_CAPTURED if captured[1] else Q_PIECE_REWARD_N_CAPTURED
+            else:
+                reward += Q_PIECE_REWARD_K_CAPTURED if captured[1] else Q_PIECE_REWARD_N_CAPTURED
 
         # add movement reward if it is an ally piece
         else:
             reward += Q_PIECE_REWARD_MOVE if ally else Q_PIECE_REWARD_ENEMY_MOVE
 
-        # add reward if the piece is kinged
-        if newPos[1] == 0:
+        # add reward if the piece is kinged, meaning the piece is currently not a king, and it reaches the end
+        if not king and newPos[1] == 0:
             reward += Q_PIECE_REWARD_KING if ally else Q_PIECE_REWARD_KINGED
 
         return reward
@@ -209,13 +208,12 @@ class PieceEnvironment(Environment):
         return self.game.canPlay(self.current, moveIntToBoolList(action))
 
     def takeAction(self, action):
-        if action is not None:
-            bins = moveIntToBoolList(action)
-            c = self.current
+        if action is None:
+            return
+        bins = moveIntToBoolList(action)
+        c = self.current
+        if c is not None:
             self.game.play(c, bins)
-        else:
-            # TODO find a more proper way to handle this
-            print("error in GameEnvironment takeAction")
 
     def performAction(self, qModel):
         self.gameEnv.performAction(self.gameNetwork)
@@ -227,8 +225,11 @@ class PieceEnvironment(Environment):
         """
         self.gameEnv.performAction(self.gameNetwork)
         state = self.currentState()
-        action = self.internalNetwork.chooseAction(self.toNetInput(), takeAction=self.canTakeAction)
-        self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
+        netInput = self.toNetInput()
+        # do nothing if there is no valid input
+        if netInput is not None:
+            action = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
+            self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
 
     def playGame(self, printReward=False):
         """
@@ -250,8 +251,13 @@ class PieceEnvironment(Environment):
             # get the current state
             state = self.currentState()
 
+            # end the game if there is no valid input for the neural network
+            netInput = self.toNetInput()
+            if netInput is None:
+                break
+
             # determine the action for that piece to take
-            action = self.internalNetwork.chooseAction(self.toNetInput(), takeAction=self.canTakeAction)
+            action = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
 
             # if no action is found, then the game is over, end the game
             if action is None:
@@ -266,7 +272,6 @@ class PieceEnvironment(Environment):
                 self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
 
         moves = self.game.moves
-        self.game.resetGame()
 
         return total, moves
 
@@ -314,25 +319,24 @@ def endGameReward(win, redSide, moves):
     """
     # if the game is not over, no reward
     if win == E_PLAYING:
-        return None
+        return Q_PIECE_REWARD_PLAYING
 
     # find the reward for number of moves made
-    moveReward = moves * Q_PIECE_REWARD_MOVES_FACTOR
+    reward = moves * Q_PIECE_REWARD_MOVES_FACTOR
 
     # if the game is a draw, return draw reward
     if win == E_DRAW:
-        return Q_PIECE_REWARD_DRAW + moveReward
+        reward += Q_PIECE_REWARD_DRAW
 
     # if red won and red was playing, or black won and black was playing, add win reward
     elif redSide and win == E_RED_WIN or not redSide and win == E_BLACK_WIN:
-        return Q_PIECE_REWARD_WIN + moveReward
+        reward += Q_PIECE_REWARD_WIN
 
     # if red won and black was playing, or black won and red was playing, add lose reward
     elif redSide and win == E_BLACK_WIN or not redSide and win == E_RED_WIN:
-        return Q_PIECE_REWARD_LOSE + moveReward
+        reward += Q_PIECE_REWARD_LOSE
 
-    # should not happen, but otherwise, there is no reward
-    return None
+    return reward
 
 
 class GameEnvironment(Environment):
@@ -387,8 +391,7 @@ class GameEnvironment(Environment):
         if action is not None:
             self.pieceEnv.current = self.game.singlePos(action)
         else:
-            # TODO find a more proper way to handle this
-            print("error in GameEnvironment takeAction")
+            self.pieceEnv.current = None
 
 
 def gameToNetInput(g, current):

@@ -9,6 +9,10 @@ Find new source of slow speed in network code, probably the training and set up 
 Try adding adaptive learning rate and discount rate
 Try using convolutional layers
 
+Allow user to train network based on the user's input
+    So when the user makes an action, that action should be used for the reward function,
+    which trains the network
+
 """
 
 # hide warnings
@@ -39,27 +43,30 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 loadModel = True
 
 # make game
-game = Game(8)
+game = Game(4)
 
-pEnv = PieceEnvironment(game, current=None)
+pEnv = PieceEnvironment(game, current=None, pieceInner=[20, 20], gameInner=[50])
 model = pEnv.internalNetwork
 model.learnRate = 0.1
-model.explorationRate = 0.1
-model.discountRate = 0.5
+model.explorationRate = 0.3
+model.discountRate = 0.7
 
 gameModel = pEnv.gameNetwork
 gameModel.learnRate = 0.1
-gameModel.explorationRate = 0.1
-gameModel.discountRate = 0.5
+gameModel.explorationRate = 0.3
+gameModel.discountRate = 0.7
 
 if loadModel:
     pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-for i in range(100):
+for i in range(200):
     currentTime = time.time()
-    print("Game: " + str(i))
-    print("Reward and total moves" + str(pEnv.playGame(printReward=False)))
+    print("Game", str(i))
+    print("Reward and total moves", str(pEnv.playGame(printReward=False)))
     print("took:", time.time() - currentTime, "seconds")
+    print(E_TEXT[game.win], "final game board:")
+    print(game.string(True))
+    print()
 
 game.resetGame()
 
