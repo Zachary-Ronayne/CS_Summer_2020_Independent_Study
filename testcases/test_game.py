@@ -301,6 +301,14 @@ class TestGame(TestCase):
         game.checkWinConditions()
         self.assertEqual(game.win, E_BLACK_WIN)
 
+        # test red wins with multiple left over pieces
+        game.resetGame()
+        for j in range(3):
+            for i in range(4):
+                game.spot(i, j, None, True)
+        game.checkWinConditions()
+        self.assertEqual(game.win, E_RED_WIN)
+
         # test game is not over with red and black both having a piece
         game.resetGame()
         game.clearBoard()

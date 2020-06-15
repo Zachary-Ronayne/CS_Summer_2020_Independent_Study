@@ -66,8 +66,6 @@ class Game:
         g = Game(self.height)
 
         g.redTurn = self.redTurn
-        g.redLeft = self.redLeft
-        g.blackLeft = self.blackLeft
         g.win = self.win
         g.movesSinceLastCapture = self.movesSinceLastCapture
         g.moves = self.moves

@@ -40,10 +40,10 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 
 # for loading in or not loading in the saved version of the Networks
-loadModel = True
+loadModel = False
 
 # make game
-game = Game(4)
+game = Game(8)
 
 pEnv = PieceEnvironment(game, current=None, pieceInner=[20, 20], gameInner=[50])
 model = pEnv.internalNetwork
