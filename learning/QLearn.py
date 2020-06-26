@@ -4,6 +4,9 @@ from Constants import *
 
 if USE_TENSOR_FLOW:
     from tensorflow import keras
+    import tensorflow as tf
+
+    tf.CUDA_VISIBLE_DEVICES = 0, 1
 
 import random
 import abc
@@ -103,6 +106,14 @@ class QModel:
         :param newRate: The new learning rate
         """
 
+    @abc.abstractmethod
+    def usesNetwork(self):
+        """
+        Determine if this QModel uses a Network input to choose an action
+        :return: True if it uses a Network input, False if it uses a numerical input
+        """
+        return False
+
 
 class Table(QModel):
     """
@@ -158,6 +169,9 @@ class Table(QModel):
 
     def updateLearningRate(self, newRate):
         self.learnRate = newRate
+
+    def usesNetwork(self):
+        return False
 
 
 class Network(QModel):
@@ -286,6 +300,9 @@ class Network(QModel):
     def updateLearningRate(self, newRate):
         self.learnRate = newRate
         self.optimizer = keras.optimizers.RMSprop(learning_rate=self.learnRate)
+
+    def usesNetwork(self):
+        return True
 
 
 class Environment:
@@ -464,7 +481,8 @@ class DummyGame(Environment):
             return CANT_MOVE
 
     def networkInputs(self):
-        return 5 * self.width() * self.height()
+        s = self.width() * self.height()
+        return s if self.sizeStates else 5 * s
 
     def toNetInput(self):
         if self.sizeStates:
@@ -591,7 +609,9 @@ class DummyGame(Environment):
                 takeA = None
             else:
                 takeA = self.canTakeAction
-            action = qModel.chooseAction(state, takeAction=takeA)
+            action = qModel.chooseAction(
+                self.toNetInput() if qModel.usesNetwork() else state,
+                takeAction=takeA)
 
             if action is not None:
                 # update the QModel with training

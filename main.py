@@ -6,35 +6,30 @@ TODO:
 Make test cases
 
 Find new source of slow speed in network code, probably the training and set up time
+    Speed up general Checkers Game code
 Try adding adaptive learning rate and discount rate
 Try using convolutional layers
+Try having two models, one for each player
+
+Add distance to other pieces as part of the reward
+    More reward for nearby pieces
+Should be no reward for invalid actions, or high negative reward
 
 Allow user to train network based on the user's input
     So when the user makes an action, that action should be used for the reward function,
     which trains the network
 
-"""
+Add a control to the GUI to tell it to make a move with an exploration rate of zero
 
-# hide warnings
-import os
-# TODO hide warnings again?
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-"""
-2020-06-11 11:36:09.516806: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'cudart64_101.dll'; dlerror: cudart64_101.dll not found
-2020-06-11 11:36:09.517508: I tensorflow/stream_executor/cuda/cudart_stub.cc:29] Ignore above cudart dlerror if you do not have a GPU set up on your machine.
-2020-06-11 11:36:13.923133: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'nvcuda.dll'; dlerror: nvcuda.dll not found
-2020-06-11 11:36:13.923260: E tensorflow/stream_executor/cuda/cuda_driver.cc:313] failed call to cuInit: UNKNOWN ERROR (303)
-2020-06-11 11:36:13.927083: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:169] retrieving CUDA diagnostic information for host: DESKTOP-AGIR9UI
-2020-06-11 11:36:13.927254: I tensorflow/stream_executor/cuda/cuda_diagnostics.cc:176] hostname: DESKTOP-AGIR9UI
-2020-06-11 11:36:13.930923: I tensorflow/core/platform/cpu_feature_guard.cc:143] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2
-2020-06-11 11:36:13.965047: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x2ce45804a70 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
-2020-06-11 11:36:13.965201: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+Fix the dummy model not working with recent changes
+
 """
 
 # normal imports
 from Checkers.Gui import *
 from Checkers.Environments import *
 
+"""
 # center pygame window
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
@@ -45,24 +40,24 @@ loadModel = False
 # make game
 game = Game(8)
 
-pEnv = PieceEnvironment(game, current=None, pieceInner=[20, 20], gameInner=[50])
+pEnv = PieceEnvironment(game, current=None, pieceInner=[200, 200], gameInner=[500])
 model = pEnv.internalNetwork
 model.learnRate = 0.1
-model.explorationRate = 0.3
-model.discountRate = 0.7
+model.explorationRate = 0.1
+model.discountRate = 0.0
 
 gameModel = pEnv.gameNetwork
 gameModel.learnRate = 0.1
-gameModel.explorationRate = 0.3
-gameModel.discountRate = 0.7
+gameModel.explorationRate = 0.1
+gameModel.discountRate = 0.0
 
 if loadModel:
     pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-for i in range(200):
+for i in range(30):
     currentTime = time.time()
     print("Game", str(i))
-    print("Reward and total moves", str(pEnv.playGame(printReward=False)))
+    print("(red reward, black reward, total moves)", str(pEnv.playGame(printReward=False)))
     print("took:", time.time() - currentTime, "seconds")
     print(E_TEXT[game.win], "final game board:")
     print(game.string(True))
@@ -72,11 +67,10 @@ game.resetGame()
 
 gui = Gui(pEnv, printFPS=False)
 gui.loop()
-
+"""
 
 # create a grid
-"""
-gridUse = 2
+gridUse = 4
 
 if gridUse == 0:
     gridW, gridH = 3, 1
@@ -134,47 +128,50 @@ else:
     # grid[4, 3] = GOOD
 
 
-# make the model
-model = DummyGame(grid, sizeStates=True, pos=(startX, startY))
+def testDummyGame():
+    """
+    Simple code used to test the execution of the DummyEnvironment with Q learning
+    """
+    # make the model
+    model = DummyGame(grid, sizeStates=True, pos=(startX, startY))
 
-# use the network model, or the QTable model
-network = True
+    # use the network model, or the QTable model
+    network = True
 
-if network:
-    # make the network
-    net = Network(NUM_ACTIONS, model, inner=[],
-                  learnRate=0.1, explorationRate=0.1, discountRate=0.5)
+    if network:
+        # make the network
+        net = Network(NUM_ACTIONS, model, inner=[],
+                      learnRate=0.1, explorationRate=0.1, discountRate=0.5)
 
-    # train the network
-    for i in range(15):
-        total = model.playGame(net, learn=True)
-        print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
+        # train the network
+        for i in range(15):
+            total = model.playGame(net, learn=True)
+            print("Training: " + str(i) + ", " + str(model.x) + " " + str(model.y) + " " + str(total))
 
-    # run the final results of the trained model
-    net.explorationRate = 0
-    print("Final score: " + str(model.playGame(net, learn=False, printPos=True)))
+        # run the final results of the trained model
+        net.explorationRate = 0
+        print("Final score: " + str(model.playGame(net, learn=False, printPos=True)))
 
-    print("Final Pos: " + str(model.x) + " " + str(model.y))
-    print("Grid:")
-    print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
+        print("Final Pos: " + str(model.x) + " " + str(model.y))
+        print("Grid:")
+        print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
 
-else:
-    # make the table
-    qTable = Table(NUM_ACTIONS, model, learnRate=0.5, discountRate=0.7)
+    else:
+        # make the table
+        qTable = Table(NUM_ACTIONS, model, learnRate=0.5, discountRate=0.7)
 
-    # train model
-    qTable.explorationRate = 1
-    for i in range(1000):
-        total = model.playGame(qTable, learn=True)
+        # train model
+        qTable.explorationRate = 1
+        for i in range(100):
+            model.playGame(qTable, learn=True)
 
-    # run the model
-    qTable.explorationRate = 0
-    total = model.playGame(qTable, learn=False, printPos=True)
-    print(str(model.x) + " " + str(model.y) + " " + str(total))
-    print()
+        # run the model
+        qTable.explorationRate = 0
+        total = model.playGame(qTable, learn=False, printPos=True)
+        print(str(model.x) + " " + str(model.y) + " " + str(total))
+        print()
 
-    # print the game grid and q table
-    print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
-    print()
-    print(qTable.qTable)
-"""
+        # print the game grid and q table
+        print(np.array([[model.rewards[g] for g in gg] for gg in grid]))
+        print()
+        print(qTable.qTable)
