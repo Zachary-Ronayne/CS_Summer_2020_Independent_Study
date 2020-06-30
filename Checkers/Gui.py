@@ -19,7 +19,7 @@ E_GAME_STATE_Y = 10
 DR_SQUARE_SIZE = 80
 DR_BORDER_SIZE = 20
 DR_GAME_BORDER_SIZE = 5
-DR_TOP_SPACE = 140
+DR_TOP_SPACE = 150
 DR_GRID_X = DR_BORDER_SIZE + DR_GAME_BORDER_SIZE
 DR_GRID_Y = DR_BORDER_SIZE + DR_TOP_SPACE + DR_GAME_BORDER_SIZE
 DR_PIECE_SIZE = 70
@@ -28,14 +28,15 @@ DR_FONT_SIZE = 50
 DR_FONT_FACE = "Arial"
 
 # constants for instruction text at the top
-I_FONT_SIZE = 17
+I_FONT_SIZE = 16
 I_UP_LEFT_X = 10
 I_UP_LEFT_Y = 60
-I_LINE_SPACING = 19
+I_LINE_SPACING = 18
 I_TEXT = [
     "R: reset game",
     "A: make AI move",
     "T: make AI move and train",
+    "Q: make AI move without exploring",
     "S: save the current state of the model",
     "ESC: close game"
 ]
@@ -224,26 +225,45 @@ class Gui:
             if self.makeQModelMove():
                 self.unselectSquare()
         elif k == pygame.K_t:
-            if self.makeQModelMove(True):
+            if self.makeQModelMove(train=True):
+                self.unselectSquare()
+        elif k == pygame.K_q:
+            if self.makeQModelMove(explore=0):
                 self.unselectSquare()
         elif k == pygame.K_s:
             # TODO should add some kind of notification on the screen for successful or failed save
             self.qEnv.saveNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-    def makeQModelMove(self, train=False):
+    def makeQModelMove(self, train=False, explore=None):
         """
         Make the next move in the game with the current QModel. Does nothing if that QModel is None
         :param train: True to also train the network with this move, False otherwise, default False
+        :param explore: The exploration rate to use for this move, None to not make any changes, default None
         :return True if a move was successfully made, False otherwise
         """
+
+        # save the old exploration rate
+        oldExplorePiece = self.qEnv.internalNetwork.explorationRate
+        oldExploreGame = self.qEnv.gameNetwork.explorationRate
+        # set the new exploration rate
+        if explore is not None:
+            self.qEnv.internalNetwork.explorationRate = explore
+            self.qEnv.gameNetwork.explorationRate = explore
+
+        # ensure a model exists
         model = self.qEnv.internalNetwork
         if model is None or self.qEnv is None:
             return False
 
+        # make the move
         if train:
             self.qEnv.trainMove()
         else:
             self.qEnv.performAction(model)
+
+        # reset the exploration rate
+        self.qEnv.internalNetwork.explorationRate = oldExplorePiece
+        self.qEnv.gameNetwork.explorationRate = oldExploreGame
 
         return True
 

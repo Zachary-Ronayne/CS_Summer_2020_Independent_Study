@@ -281,7 +281,10 @@ class Network(QModel):
         Get the output values of the model
         :return: The output values as a numpy array
         """
-        return self.net.predict(self.getInputs(), verbose=0)
+
+        # TODO try using self.net(self.getInputs())
+        #   that should give better performance
+        return self.net.predict(self.getInputs(), verbose=0, use_multiprocessing=True, batch_size=None)
 
     def getInputs(self):
         """

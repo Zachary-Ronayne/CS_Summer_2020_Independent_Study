@@ -3,7 +3,7 @@ E_PLAYING = 0
 E_RED_WIN = 1
 E_BLACK_WIN = 2
 E_DRAW = 3
-E_MAX_MOVES_WITHOUT_CAPTURE = 50
+E_MAX_MOVES_WITHOUT_CAPTURE = 25
 E_TEXT = [
     "Game In Progress",
     "Red Wins!",

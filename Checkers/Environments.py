@@ -92,7 +92,6 @@ class PieceEnvironment(Environment):
 
     def rewardFunc(self, s, a):
         # save the old game and current values
-        oldGame = self.game
         oldCurrent = self.current
 
         # initial reward for making a move
@@ -100,48 +99,50 @@ class PieceEnvironment(Environment):
 
         # make a copy of the game and set it to the internal game objects
         newState = s.makeCopy()
-        self.game = newState
-        self.gameEnv.game = newState
 
         # keep track of the player being given this reward
         redTurn = newState.redTurn
 
         # make moves until it is the enemy's turn, or the game ends
-        # TODO find out why sometimes oneActionReward returns None, that condition should never be reached
-        while redTurn == self.game.redTurn and self.game.win == E_PLAYING:
-            r = self.oneActionReward(a, redTurn)
+        while redTurn == newState.redTurn and newState.win == E_PLAYING:
+            r = self.oneActionReward(newState, a, redTurn)
+            newState.checkWinConditions()
             if r is None:
                 break
             else:
                 totalReward += r
             a = None
 
-        # continue to make moves, until it is again the original players turn, or the game ends
-        while not redTurn == self.game.redTurn and self.game.win == E_PLAYING:
-            r = self.oneActionReward(None, redTurn)
+        # continue to make moves, until it is again the original player's turn, or the game ends
+        while not redTurn == newState.redTurn and newState.win == E_PLAYING:
+            r = self.oneActionReward(newState, None, redTurn)
             if r is None:
                 break
             else:
                 totalReward += r
 
-        # put the game object back to normal
-        # TODO is there a better way of doing this?
-        self.game = oldGame
-        self.gameEnv.game = oldGame
+        # put the game object current back to normal
         self.current = oldCurrent
 
         return totalReward
 
-    def oneActionReward(self, action, redTurn):
+    def oneActionReward(self, state, action, redTurn):
         """
-        Determine the reward for taking the given action, with no further moves.
-        The action is always taken from the perspective of the current turn of the internal game object
+        Determine the reward for taking the given action in the given state, with no further moves.
+        The action is always taken from the perspective of the current turn of the internal game object.
+        The state of the current game is always modified, a copy should be sent if the state should not be modified.
+        :param state: The state where the given action should take place
         :param action: The action to take, None if an action must be determined
         :param redTurn: True if this action should be based on red side, False for black side.
             The reward returned is based on whose turn it is in the game, and this value.
             For example, if redTurn is True, and red is moving, then capturing a piece will return positive reward.
         :return: The reward for making the move, or None if no action could be taken
         """
+
+        # save the original game
+        oldGame = self.game
+        self.game = state
+        self.gameEnv.game = state
 
         # initialize reward for this action
         totalReward = 0
@@ -164,7 +165,7 @@ class PieceEnvironment(Environment):
                 #   only set that if the game is over, so if that first move ended the game
                 #   then this part of the code should never be reached
                 # If this line is reached, then some error has happened
-                return None
+                action = None
 
         piecePos = self.current
 
@@ -174,14 +175,27 @@ class PieceEnvironment(Environment):
             modifiers = moveIntToBoolList(action)
 
             # add the reward for the piece moving
-            totalReward += moveReward(self.currentState(), piecePos, modifiers)
-            # make the move
-            self.game.play(piecePos, modifiers)
+            moveR = moveReward(self.game, piecePos, modifiers)
+            if moveR is not None:
+                totalReward += moveR
+                # make the move
+                self.game.play(piecePos, modifiers)
 
-            # if the game ends, add reward for winning
-            winReward = endGameReward(self.game.win, redTurn, self.game.moves)
-            if winReward is not None:
-                totalReward += winReward
+                # if the game ends, add reward for winning
+                winReward = endGameReward(self.game.win, redTurn, self.game.moves)
+                if winReward is not None:
+                    totalReward += winReward
+            else:
+                # if no move reward was found, then there was no valid reward, so set the reward to None
+                totalReward = None
+
+        # ensure that the win conditions are checked
+        # TODO should this win condition check be here?
+        # self.game.checkWinConditions()
+
+        # put the game back to it's original state
+        self.game = oldGame
+        self.gameEnv.game = oldGame
 
         # return the final reward
         return totalReward
@@ -215,14 +229,15 @@ class PieceEnvironment(Environment):
     def trainMove(self):
         """
         Make a move in the game, and train the network based on that move
+        :return The action taken by the PieceNetwork, None if no action can be taken
         """
-        state = self.currentState()
-        # TODO make this actually train the gameNetwork
-        #   and improve this code
-        #   also test this code
-        #   probably abstract out some of this code
+        state = self.currentState().makeCopy()
         gameNetInput = self.gameEnv.toNetInput()
-        self.gameNetwork.train(state, self.gameNetwork.chooseAction(gameNetInput, self.gameEnv.canTakeAction))
+        action = self.gameNetwork.chooseAction(gameNetInput, takeAction=self.gameEnv.canTakeAction)
+        if action is not None:
+            self.gameNetwork.train(state, action, self.gameEnv.canTakeAction)
+        else:
+            return None
 
         self.gameEnv.performAction(self.gameNetwork)
 
@@ -230,7 +245,9 @@ class PieceEnvironment(Environment):
         # do nothing if there is no valid input
         if netInput is not None:
             action = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
-            self.internalNetwork.train(state.makeCopy(), action, takeAction=self.canTakeAction)
+            self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
+            return action
+        return None
 
     def playGame(self, printReward=False):
         """
@@ -247,29 +264,11 @@ class PieceEnvironment(Environment):
         # play the game until it's over
         while self.game.win == E_PLAYING:
 
-            # get the current state
-            state = self.currentState()
+            # make a copy the current state used for determining reward
+            state = self.currentState().makeCopy()
 
-            # select a piece for the AI to play
-            self.gameEnv.performAction(self.gameNetwork)
-
-            # TODO make this actually train the gameNetwork
-            #   and improve this code
-            #   also test this code
-            #   probably abstract out some of this code
-            # train the GameEnvironment
-            gameNetInput = self.gameEnv.toNetInput()
-            action = self.gameNetwork.chooseAction(gameNetInput, takeAction=self.gameEnv.canTakeAction)
-            if action is not None:
-                self.gameNetwork.train(state.makeCopy(), action, self.gameEnv.canTakeAction)
-
-            # end the game if there is no valid input for the neural network
-            netInput = self.toNetInput()
-            if netInput is None:
-                break
-
-            # determine the action for that piece to take
-            action = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
+            # train the GameEnvironment and make a move, get the the action taken
+            action = self.trainMove()
 
             # if no action is found, then the game is over, end the game
             if action is None:
@@ -287,7 +286,6 @@ class PieceEnvironment(Environment):
                 else:
                     blackTotal += reward
                     blackMoves += 1
-                self.internalNetwork.train(state.makeCopy(), action, takeAction=self.canTakeAction)
 
         return redTotal, blackTotal, redMoves, blackMoves
 
@@ -329,13 +327,19 @@ def moveReward(state, position, modifiers):
     :param state: The current state of the game
     :param position: The position of the piece to move
     :param modifiers: The modifiers defining how the piece moves
-    :return: The total reward gained from moving
+    :return: The total reward gained from moving, None if no valid pieces were given
     """
 
     reward = 0
     newPos = movePos(position, modifiers)
     x, y = position
-    ally, king = state.gridPos(x, y, state.redTurn)
+
+    selectPos = state.gridPos(x, y, state.redTurn)
+    # if there is no valid piece to move, then return no reward
+    if selectPos is None:
+        return None
+    else:
+        ally, king = selectPos
 
     # if it's a jump, add capture reward for appropriate piece
     if modifiers[2]:

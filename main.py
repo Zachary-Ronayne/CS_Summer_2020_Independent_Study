@@ -3,12 +3,11 @@
 
 TODO:
 
-Make test cases
-
-Find new source of slow speed in network code, probably the training and set up time
-    Speed up general Checkers Game code
-Try adding adaptive learning rate and discount rate
+Get graphics card working
+Demonstrate intelligent gameplay on 4x4 or 6x6
+Speed up general Checkers Game code
 Try using convolutional layers
+Try adding adaptive learning rate and discount rate
 Try having two models, one for each player
 
 Add distance to other pieces as part of the reward
@@ -18,10 +17,6 @@ Should be no reward for invalid actions, or high negative reward
 Allow user to train network based on the user's input
     So when the user makes an action, that action should be used for the reward function,
     which trains the network
-
-Add a control to the GUI to tell it to make a move with an exploration rate of zero
-
-Fix the dummy model not working with recent changes
 
 """
 
@@ -34,6 +29,9 @@ from Checkers.Environments import *
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 
+checkers = True
+
+
 def testCheckers():
     """
     Simple code for playing checkers game
@@ -42,26 +40,26 @@ def testCheckers():
     loadModel = False
 
     # make game
-    game = Game(8)
+    game = Game(4)
 
-    pEnv = PieceEnvironment(game, current=None, pieceInner=[200, 200], gameInner=[500])
+    pEnv = PieceEnvironment(game, current=None, pieceInner=[20, 20], gameInner=[50])
     model = pEnv.internalNetwork
-    model.learnRate = 0.1
-    model.explorationRate = 0.1
-    model.discountRate = 0.0
+    model.learnRate = 0.2
+    model.explorationRate = 0.2
+    model.discountRate = 0.4
 
     gameModel = pEnv.gameNetwork
-    gameModel.learnRate = 0.1
-    gameModel.explorationRate = 0.1
-    gameModel.discountRate = 0.0
+    gameModel.learnRate = 0.2
+    gameModel.explorationRate = 0.2
+    gameModel.discountRate = 0.4
 
     if loadModel:
         pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
 
-    for i in range(30):
+    for i in range(0):
         currentTime = time.time()
         print("Game", str(i))
-        print("(red reward, black reward, total moves)", str(pEnv.playGame(printReward=False)))
+        print("(red, black reward, red, black moves)", str(pEnv.playGame(printReward=False)))
         print("took:", time.time() - currentTime, "seconds")
         print(E_TEXT[game.win], "final game board:")
         print(game.string(True))
@@ -146,7 +144,7 @@ def testDummyGame():
         net = Network(NUM_ACTIONS, env, inner=[],
                       learnRate=0.1, explorationRate=0.1, discountRate=0.5)
         # train the network
-        for j in range(15):
+        for j in range(50):
             total = env.playGame(net, learn=True)
             print("Training: " + str(j) + ", " + str(env.x) + " " + str(env.y) + " " + str(total))
 
@@ -179,4 +177,7 @@ def testDummyGame():
         print(qTable.qTable)
 
 
-testDummyGame()
+if checkers:
+    testCheckers()
+else:
+    testDummyGame()
