@@ -91,9 +91,6 @@ class PieceEnvironment(Environment):
         return self.networkInputs()
 
     def rewardFunc(self, s, a):
-        # save the old game and current values
-        oldCurrent = self.current
-
         # initial reward for making a move
         totalReward = 0
 
@@ -106,7 +103,6 @@ class PieceEnvironment(Environment):
         # make moves until it is the enemy's turn, or the game ends
         while redTurn == newState.redTurn and newState.win == E_PLAYING:
             r = self.oneActionReward(newState, a, redTurn)
-            newState.checkWinConditions()
             if r is None:
                 break
             else:
@@ -120,9 +116,6 @@ class PieceEnvironment(Environment):
                 break
             else:
                 totalReward += r
-
-        # put the game object current back to normal
-        self.current = oldCurrent
 
         return totalReward
 
@@ -139,10 +132,26 @@ class PieceEnvironment(Environment):
         :return: The reward for making the move, or None if no action could be taken
         """
 
+        # TODO abstract out some of this code
+        #   it should allow for the use of any Environment object
+        #   to use the internalNetworks and gameNetwork.
+        #   This will allow the DuelModel objects to use opposite side networks
+        #   for each other's reward functions.
+
+        # TODO also need to make it possible for a player to train the network
+        #   The environment should make a move and remember the state and action for that move
+        #   Then when the player makes a move, that is the move used for determining the next
+        #   part of the reward function, determining the punishment.
+        #   Essentially, remember the reward for making the moves to make it the player's turn
+        #   then add the punishment received for the player making their moves
+        #   Once both values are determined, train the network with that state and action,
+        #   using the total reward and punishment
+
         # save the original game
         oldGame = self.game
         self.game = state
         self.gameEnv.game = state
+        oldCurrent = self.current
 
         # initialize reward for this action
         totalReward = 0
@@ -190,12 +199,13 @@ class PieceEnvironment(Environment):
                 totalReward = None
 
         # ensure that the win conditions are checked
-        # TODO should this win condition check be here?
-        # self.game.checkWinConditions()
+        # TODO should this win condition check be here? It should be somewhere else?
+        self.game.checkWinConditions()
 
         # put the game back to it's original state
         self.game = oldGame
         self.gameEnv.game = oldGame
+        self.current = oldCurrent
 
         # return the final reward
         return totalReward
@@ -263,24 +273,12 @@ class PieceEnvironment(Environment):
 
         # play the game until it's over
         while self.game.win == E_PLAYING:
-
-            # make a copy the current state used for determining reward
-            state = self.currentState().makeCopy()
-
-            # train the GameEnvironment and make a move, get the the action taken
-            action = self.trainMove()
-
-            # if no action is found, then the game is over, end the game
-            if action is None:
+            turn = self.game.redTurn
+            reward = self.playGameMove(printReward)
+            if reward is None:
                 break
-            # otherwise, perform the action by training with it
             else:
-                # find the reward for the action
-                reward = self.rewardFunc(state, action)
-                if printReward:
-                    print("Reward this turn: " + str(reward))
-
-                if state.redTurn:
+                if turn:
                     redTotal += reward
                     redMoves += 1
                 else:
@@ -288,6 +286,32 @@ class PieceEnvironment(Environment):
                     blackMoves += 1
 
         return redTotal, blackTotal, redMoves, blackMoves
+
+    def playGameMove(self, printReward):
+        """
+        Utility used by play game. Make a single move in the process of playing the game, and train
+            the network for making that move
+        :param printReward: True to print thr reward gained from this move, False otherwise
+        :return: The reward gained from this move
+        """
+
+        # make a copy the current state used for determining reward
+        state = self.currentState().makeCopy()
+
+        # train the GameEnvironment and make a move, get the the action taken
+        action = self.trainMove()
+
+        # if no action is found, then the game is over, end the game
+        if action is None:
+            return None
+        # otherwise, perform the action by training with it
+        else:
+            # find the reward for the action
+            reward = self.rewardFunc(state, action)
+            if printReward:
+                print("Reward this turn: " + str(reward))
+
+            return reward
 
     def saveNetworks(self, pieceName, networkName):
         """

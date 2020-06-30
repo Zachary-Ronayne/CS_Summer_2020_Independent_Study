@@ -71,7 +71,7 @@ class Gui:
         :param fps: The capped frame rate of the Gui, default 20
         :param printFPS: True to print the frames per second, every second, False otherwise, default False
         """
-        self.qEnv = qObject
+        self.qDuelModel = qObject
         self.game = qObject.game
 
         # setup pygame
@@ -232,7 +232,7 @@ class Gui:
                 self.unselectSquare()
         elif k == pygame.K_s:
             # TODO should add some kind of notification on the screen for successful or failed save
-            self.qEnv.saveNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
+            self.qDuelModel.save("", DUEL_MODEL_NAME)
 
     def makeQModelMove(self, train=False, explore=None):
         """
@@ -242,28 +242,32 @@ class Gui:
         :return True if a move was successfully made, False otherwise
         """
 
+        # get the appropriate environment
+        qEnv = self.qDuelModel.currentEnvironment()
+
         # save the old exploration rate
-        oldExplorePiece = self.qEnv.internalNetwork.explorationRate
-        oldExploreGame = self.qEnv.gameNetwork.explorationRate
+        oldExplorePiece = qEnv.internalNetwork.explorationRate
+        oldExploreGame = qEnv.gameNetwork.explorationRate
+
         # set the new exploration rate
         if explore is not None:
-            self.qEnv.internalNetwork.explorationRate = explore
-            self.qEnv.gameNetwork.explorationRate = explore
+            qEnv.internalNetwork.explorationRate = explore
+            qEnv.gameNetwork.explorationRate = explore
 
         # ensure a model exists
-        model = self.qEnv.internalNetwork
-        if model is None or self.qEnv is None:
+        model = qEnv.internalNetwork
+        if model is None or qEnv is None:
             return False
 
         # make the move
         if train:
-            self.qEnv.trainMove()
+            qEnv.trainMove()
         else:
-            self.qEnv.performAction(model)
+            qEnv.performAction(model)
 
         # reset the exploration rate
-        self.qEnv.internalNetwork.explorationRate = oldExplorePiece
-        self.qEnv.gameNetwork.explorationRate = oldExploreGame
+        qEnv.internalNetwork.explorationRate = oldExplorePiece
+        qEnv.gameNetwork.explorationRate = oldExploreGame
 
         return True
 

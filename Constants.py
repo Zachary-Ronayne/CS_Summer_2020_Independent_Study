@@ -44,3 +44,4 @@ USE_PY_GAME = True
 NETWORK_SAVES = "saves"
 PIECE_NETWORK_NAME = "piece"
 GAME_NETWORK_NAME = "game"
+DUEL_MODEL_NAME = "duel model"

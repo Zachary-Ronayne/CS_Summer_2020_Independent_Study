@@ -5,24 +5,34 @@ TODO:
 
 Get graphics card working
 Demonstrate intelligent gameplay on 4x4 or 6x6
+
+Have the duel models interact, one model uses the other for determining opponent moves for reward func
+    Also allow user to train network based on the user's input
+    So when the user makes an action, that action should be used for the reward function,
+    which trains the network
+    Both of these modifications to the reward function would be a part of some kind of abstraction
+
 Speed up general Checkers Game code
 Try using convolutional layers
 Try adding adaptive learning rate and discount rate
-Try having two models, one for each player
 
 Add distance to other pieces as part of the reward
     More reward for nearby pieces
 Should be no reward for invalid actions, or high negative reward
 
-Allow user to train network based on the user's input
-    So when the user makes an action, that action should be used for the reward function,
-    which trains the network
+
+In Environments, does there need to be a win condition check?
+In QLearn, try using model(input) using __call__ for potentially better performance
+In GUI, add notification on the screen for a successful or unsuccessful save
+In GUI, reorganize some of the code in handleMouseUp()
+
+Allow network data outside TensorFlow to be saved, like learning rate and related
 
 """
 
 # normal imports
 from Checkers.Gui import *
-from Checkers.Environments import *
+from Checkers.DuelModel import *
 
 
 # center pygame window
@@ -30,6 +40,15 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 
 
 checkers = True
+
+
+def setRates(model):
+    """
+    Utility for setting hyperparameters
+    """
+    model.learnRate = 0.2
+    model.explorationRate = 0.2
+    model.discountRate = 0.4
 
 
 def testCheckers():
@@ -42,24 +61,19 @@ def testCheckers():
     # make game
     game = Game(4)
 
-    pEnv = PieceEnvironment(game, current=None, pieceInner=[20, 20], gameInner=[50])
-    model = pEnv.internalNetwork
-    model.learnRate = 0.2
-    model.explorationRate = 0.2
-    model.discountRate = 0.4
-
-    gameModel = pEnv.gameNetwork
-    gameModel.learnRate = 0.2
-    gameModel.explorationRate = 0.2
-    gameModel.discountRate = 0.4
+    env = DuelModel(game, rPieceInner=[20, 20], rGameInner=[50], bPieceInner=[20, 20], bGameInner=[50])
+    setRates(env.redEnv.internalNetwork)
+    setRates(env.redEnv.gameNetwork)
+    setRates(env.blackEnv.internalNetwork)
+    setRates(env.blackEnv.gameNetwork)
 
     if loadModel:
-        pEnv.loadNetworks(PIECE_NETWORK_NAME, GAME_NETWORK_NAME)
+        env.load("", DUEL_MODEL_NAME)
 
-    for i in range(0):
+    for i in range(30):
         currentTime = time.time()
         print("Game", str(i))
-        print("(red, black reward, red, black moves)", str(pEnv.playGame(printReward=False)))
+        print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))
         print("took:", time.time() - currentTime, "seconds")
         print(E_TEXT[game.win], "final game board:")
         print(game.string(True))
@@ -67,7 +81,7 @@ def testCheckers():
 
     game.resetGame()
 
-    gui = Gui(pEnv, printFPS=False)
+    gui = Gui(env, printFPS=False)
     gui.loop()
 
 
