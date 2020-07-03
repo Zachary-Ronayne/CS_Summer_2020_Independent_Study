@@ -75,6 +75,15 @@ class QModel:
 
         return action
 
+    def randomValidAction(self):
+        """
+        Pick a random valid action that can be taken by this QModel
+        :return: The action as a numerical ID, or None if no action is possible
+        """
+        a = [0] * self.actions
+        a = chooseElements(a, self.environment.canTakeAction)
+        return None if a is None or len(a) == 0 else a[random.randint(0, len(a) - 1)][0]
+
     @abc.abstractmethod
     def getActions(self, s):
         """
@@ -275,6 +284,15 @@ class Network(QModel):
 
         # return that the training happened successfully
         return success
+
+    def trainMultiple(self, inputs, outputs):
+        """
+        Train this Network based on a list of lists of input
+        :param inputs: The input data
+        :param outputs: The expected output data
+        """
+        self.net.fit(np.array(inputs), np.array(outputs),
+                     verbose=0, use_multiprocessing=True, epochs=10, batch_size=None)
 
     def getOutputs(self):
         """

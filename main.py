@@ -3,14 +3,13 @@
 
 TODO:
 
-Get graphics card working
 Demonstrate intelligent gameplay on 4x4 or 6x6
 
-Have the duel models interact, one model uses the other for determining opponent moves for reward func
-    Also allow user to train network based on the user's input
+Improve code when making random moves
+
+Also allow user to train network based on the user's input
     So when the user makes an action, that action should be used for the reward function,
     which trains the network
-    Both of these modifications to the reward function would be a part of some kind of abstraction
 
 Speed up general Checkers Game code
 Try using convolutional layers
@@ -34,10 +33,11 @@ Allow network data outside TensorFlow to be saved, like learning rate and relate
 from Checkers.Gui import *
 from Checkers.DuelModel import *
 
-
 # center pygame window
 os.environ['SDL_VIDEO_CENTERED'] = "1"
 
+# disable GPU
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 checkers = True
 
@@ -61,7 +61,8 @@ def testCheckers():
     # make game
     game = Game(4)
 
-    env = DuelModel(game, rPieceInner=[20, 20], rGameInner=[50], bPieceInner=[20, 20], bGameInner=[50])
+    env = DuelModel(game, rPieceInner=[200], rGameInner=[500],
+                    bPieceInner=[200], bGameInner=[500])
     setRates(env.redEnv.internalNetwork)
     setRates(env.redEnv.gameNetwork)
     setRates(env.blackEnv.internalNetwork)
@@ -70,7 +71,7 @@ def testCheckers():
     if loadModel:
         env.load("", DUEL_MODEL_NAME)
 
-    for i in range(30):
+    for i in range(0):
         currentTime = time.time()
         print("Game", str(i))
         print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))
@@ -78,6 +79,8 @@ def testCheckers():
         print(E_TEXT[game.win], "final game board:")
         print(game.string(True))
         print()
+
+    env.trainCollective(10, printGames=True)
 
     game.resetGame()
 

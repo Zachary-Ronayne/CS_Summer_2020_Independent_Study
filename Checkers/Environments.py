@@ -35,9 +35,9 @@ Q_PIECE_REWARD_KING = 5
 # reward when an enemy piece becomes a king
 Q_PIECE_REWARD_KINGED = -2
 # reward for winning the game
-Q_PIECE_REWARD_WIN = 100
+Q_PIECE_REWARD_WIN = 1000
 # reward for losing the game
-Q_PIECE_REWARD_LOSE = -200
+Q_PIECE_REWARD_LOSE = -2000
 # reward for drawing the game
 Q_PIECE_REWARD_DRAW = -50
 # reward for the game being still in progress
@@ -53,7 +53,7 @@ class PieceEnvironment(Environment):
     This environment considers the move they take, and the next opponent move when determining rewards
     """
 
-    def __init__(self, game, current=None, gameInner=None, pieceInner=None):
+    def __init__(self, game, current=None, gameInner=None, pieceInner=None, enemyEnv=None):
         """
         Create a new Environment for determining which move a given piece should move
         :param game: The Checkers Game that the piece will exist
@@ -65,6 +65,8 @@ class PieceEnvironment(Environment):
             None to have no inner layers, default None. Should only be positive integers
         :param gameInner: The inner layers of the Network used for controlling the piece selection,
             None to have no inner layers, default None.  Should only be positive integers
+        :param enemyEnv: The environment used to make enemy moves. Use None to make the same network used
+            for ally and enemy moves. Default None
         """
         self.game = game
         self.gameEnv = GameEnvironment(self.game, self)
@@ -73,6 +75,8 @@ class PieceEnvironment(Environment):
 
         self.internalNetwork = Network(Q_PIECE_NUM_ACTIONS, self,
                                        inner=[] if pieceInner is None else pieceInner)
+
+        self.enemyEnv = enemyEnv
 
         self.current = current
 
@@ -89,6 +93,13 @@ class PieceEnvironment(Environment):
 
     def numStates(self):
         return self.networkInputs()
+
+    def getEnemyEnv(self):
+        """
+        Determine the environment used by the enemy
+        :return: The environment
+        """
+        return self if self.enemyEnv is None else self.enemyEnv
 
     def rewardFunc(self, s, a):
         # initial reward for making a move
@@ -109,9 +120,12 @@ class PieceEnvironment(Environment):
                 totalReward += r
             a = None
 
+        # select the correct environment, depending on if an enemy environment exists
+        env = self.getEnemyEnv()
+
         # continue to make moves, until it is again the original player's turn, or the game ends
         while not redTurn == newState.redTurn and newState.win == E_PLAYING:
-            r = self.oneActionReward(newState, None, redTurn)
+            r = env.oneActionReward(newState, None, redTurn)
             if r is None:
                 break
             else:
@@ -131,12 +145,6 @@ class PieceEnvironment(Environment):
             For example, if redTurn is True, and red is moving, then capturing a piece will return positive reward.
         :return: The reward for making the move, or None if no action could be taken
         """
-
-        # TODO abstract out some of this code
-        #   it should allow for the use of any Environment object
-        #   to use the internalNetworks and gameNetwork.
-        #   This will allow the DuelModel objects to use opposite side networks
-        #   for each other's reward functions.
 
         # TODO also need to make it possible for a player to train the network
         #   The environment should make a move and remember the state and action for that move
@@ -234,7 +242,11 @@ class PieceEnvironment(Environment):
 
     def performAction(self, qModel):
         self.gameEnv.performAction(self.gameNetwork)
-        self.takeAction(qModel.chooseAction(self.toNetInput(), self.canTakeAction))
+        net = self.toNetInput()
+        # TODO should this do something in the else case?
+        #   should only happen when no one can make any moves, so normally shouldn't be reached
+        if net is not None:
+            self.takeAction(qModel.chooseAction(net, self.canTakeAction))
 
     def trainMove(self):
         """
@@ -296,7 +308,7 @@ class PieceEnvironment(Environment):
         """
 
         # make a copy the current state used for determining reward
-        state = self.currentState().makeCopy()
+        state = self.currentState()
 
         # train the GameEnvironment and make a move, get the the action taken
         action = self.trainMove()

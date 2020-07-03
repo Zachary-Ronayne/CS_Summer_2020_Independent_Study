@@ -16,7 +16,8 @@ class DuelModel:
         :param bPieceInner: The inner layers for the black piece network
         """
         self.redEnv = PieceEnvironment(game, gameInner=rGameInner, pieceInner=rPieceInner)
-        self.blackEnv = PieceEnvironment(game, gameInner=bGameInner, pieceInner=bPieceInner)
+        self.blackEnv = PieceEnvironment(game, gameInner=bGameInner, pieceInner=bPieceInner, enemyEnv=self.redEnv)
+        self.redEnv.enemyEnv = self.blackEnv
         self.game = game
 
     def currentEnvironment(self):
@@ -82,3 +83,81 @@ class DuelModel:
         success &= self.blackEnv.loadNetworks(blackName + PIECE_NETWORK_NAME, blackName + GAME_NETWORK_NAME)
 
         return success
+
+    def trainCollective(self, games, printMoves=False, printGames=False):
+        """
+        Play the game by making moves without learning anything from them initially.
+        :param games: The number of games to make
+        :param printMoves: True to print each move made during the training, False to not print, default False
+        :param printGames: True to print when each game is done processing, False to not print, default False
+        """
+
+        if games == 0:
+            return
+
+        pieceStates = [[]] * 2
+        gameStates = [[]] * 2
+        pieceRewards = [[]] * 2
+        gameRewards = [[]] * 2
+
+        # TODO generally improve this code
+
+        # do this games number of times
+        for i in range(games):
+            # reset the game
+            self.game.resetGame()
+
+            # play the game until it ends
+            while self.game.win == E_PLAYING:
+                env = self.currentEnvironment()
+                turn = 0 if self.game.redTurn else 1
+
+                # copy the current game state
+                state = self.game
+
+                # determine the states for network input
+                gameInput = env.gameEnv.toNetInput()
+
+                # pick a random valid action for the game network
+                gameAction = env.gameNetwork.randomValidAction()
+                # if there is not a valid action, end the game
+                if gameAction is None:
+                    break
+
+                # take the game action
+                env.gameEnv.takeAction(gameAction)
+                pieceInput = env.toNetInput()
+
+                # pick a random valid action for the piece network
+                pieceAction = env.internalNetwork.randomValidAction()
+
+                # if there is not a valid action, end the game
+                if pieceAction is None:
+                    break
+
+                # save the states for network input
+                pieceStates[turn].append(pieceInput[0])
+                gameStates[turn].append(gameInput[0])
+
+                # determine the action rewards, and save them
+                reward = env.gameNetwork.getOutputs()
+                reward[0][gameAction] = env.gameEnv.rewardFunc(state, gameAction)
+                gameRewards[turn].append(reward[0])
+
+                reward = env.internalNetwork.getOutputs()
+                reward[0][pieceAction] = env.rewardFunc(state, pieceAction)
+                pieceRewards[turn].append(reward[0])
+
+                # take the piece action
+                env.takeAction(pieceAction)
+
+                if printMoves:
+                    print("taken action", gameAction, pieceAction, "on game", i)
+            if printGames:
+                print("Game", i, "done")
+
+        # after all moves have been made, run all data through training
+        self.redEnv.internalNetwork.trainMultiple(pieceStates[0], pieceRewards[0])
+        self.redEnv.gameNetwork.trainMultiple(gameStates[0], gameRewards[0])
+        self.blackEnv.internalNetwork.trainMultiple(pieceStates[1], pieceRewards[1])
+        self.blackEnv.gameNetwork.trainMultiple(gameStates[1], gameRewards[1])
