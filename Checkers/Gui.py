@@ -299,7 +299,7 @@ class Gui:
         #   then the square must be reversed to get black's perspective
         s = s if self.game.redTurn else self.game.oppositeGrid(s)
 
-        moves = self.game.calculateMoves(s)
+        moves = self.game.calculateMoves(s, self.game.redTurn)
         # need to switch the moves around to be from the red perspective if it is black's turn
         for m in moves:
             if m is None or self.game.redTurn:

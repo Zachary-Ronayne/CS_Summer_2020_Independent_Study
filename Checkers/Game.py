@@ -23,7 +23,7 @@ class Game:
     """
     An object that stores the state of a game of checkers and handles all operations controlling the game
     """
-    def __init__(self, size):
+    def __init__(self, size, autoReset=True):
         """
         Create a new Game object, initialized to a standard default state
         The grid represents a square game board, but only stores the half of the board with pieces.
@@ -41,6 +41,9 @@ class Game:
         redGrid is the grid from the perspective of red, blackGrid is from the perspective of black
         redGrid and blackGrid should not directly be accessed, use the helper functions.
         :param size: The width and height of the game board, must be an even integer > 2
+        :param autoReset: True to reset the game to a normal state by default,
+            False to only initialize bare minimum state
+            Default True, should only use False when making copies
         """
         self.width = size // 2
         self.height = size
@@ -51,27 +54,43 @@ class Game:
         self.redLeft = 0
         self.blackLeft = 0
 
+        self.redMoves = None
+        self.blackMoves = None
+
         self.win = E_PLAYING
         self.movesSinceLastCapture = 0
         # the total number of moves made in the game so far
         self.moves = 0
 
-        self.resetGame()
+        if autoReset:
+            self.resetGame()
 
     def makeCopy(self):
         """
         Get an exact copy of this game, but as a completely separate object
         :return: The copy
         """
-        g = Game(self.height)
+        g = Game(self.height, autoReset=False)
 
         g.redTurn = self.redTurn
         g.win = self.win
         g.movesSinceLastCapture = self.movesSinceLastCapture
         g.moves = self.moves
+        g.redLeft = self.redLeft
+        g.blackLeft = self.blackLeft
 
-        pieces = self.toList()
-        g.setBoard(pieces, g.redTurn)
+        g.redGrid = []
+        g.blackGrid = []
+        for rr, rb in zip(self.redGrid, self.blackGrid):
+            g.redGrid.append([])
+            g.blackGrid.append([])
+            for cr, cb in zip(rr, rb):
+                g.redGrid[-1].append(cr)
+                g.blackGrid[-1].append(cb)
+
+        g.redMoves = {m: None for m in self.redMoves}
+        g.blackMoves = {m: None for m in self.blackMoves}
+
         return g
 
     def resetGame(self):
@@ -92,6 +111,11 @@ class Game:
         # track the number of each piece
         self.redLeft = 0
         self.blackLeft = 0
+
+        # keep track of all the moves that can be made
+        #   the keys are the coordinates represented as an integer, determined by the method self.singlePos
+        self.redMoves = {}
+        self.blackMoves = {}
 
         # fill in each row
         for y in range(fill):
@@ -154,6 +178,15 @@ class Game:
         :return: A 2-tuple (x, y) of grid coordinates
         """
         return s % self.width, s // self.width
+
+    def toSinglePos(self, x, y):
+        """
+        Convert an (x, y) coordinate to a single number representing that location on the grid
+        :param x: The x coordinate
+        :param y: The y coordinate
+        :return: The single number
+        """
+        return x + y * self.width
 
     def string(self, red):
         """
@@ -219,10 +252,10 @@ class Game:
         :param x: The x coordinate
         :param y: The y coordinate
         :param value: The new value
-        :param red: True if this should access from Red size, False otherwise
+        :param red: True if this should access from Red side, False otherwise
         """
 
-        oldSpace = self.redGrid[y][x] if red else self.blackGrid[y][x]
+        oldSpace = self.gridPos(x, y, red)
 
         allyX, allyY = x, y
         enemyX, enemyY = self.oppositeGrid((allyX, allyY))
@@ -239,7 +272,7 @@ class Game:
             self.redGrid[enemyY][enemyX] = enemy
             self.blackGrid[allyY][allyX] = ally
 
-        newSpace = self.redGrid[y][x] if red else self.blackGrid[y][x]
+        newSpace = self.gridPos(x, y, red)
 
         if not newSpace == oldSpace:
             if newSpace is not None:
@@ -253,6 +286,44 @@ class Game:
                 else:
                     self.blackLeft -= 1
 
+        # TODO reduce and optimize this code
+        # find all spaces that need to be updated
+        spaces = [(x, y)]
+        for i in range(8):
+            spaces.append(movePos((x, y), moveIntToBoolList(i)))
+        for s in spaces:
+            sx, sy = s
+            if self.inRange(sx, sy):
+                sGrid = self.gridPos(sx, sy, red)
+                # determine if each space has moves
+                hasMoves = self.canMovePos(s, red)
+                # if this is from red's side, then change the position directly in the redMoves dictionary
+                #   otherwise use the opposite side, because s is relative to black side
+                changeR = s if red else self.oppositeGrid(s)
+                # do the same, but in reverse for black side
+                changeB = self.oppositeGrid(s) if red else s
+                # if the space has no moves remove that space from both moves lists
+                if not hasMoves:
+                    dictRemove(self.redMoves, changeR)
+                    dictRemove(self.blackMoves, changeB)
+                # if the space is not empty, remove it from the opposite side's moves dictionary,
+                #   and add it to the corresponding side's dictionary
+                else:
+                    # if red side and enemy, or black side and ally,
+                    #   remove it from red's dictionary, add to black's dictionary
+                    if red ^ sGrid[0]:
+                        dictRemove(self.redMoves, changeR)
+                        self.blackMoves[changeB] = None
+                    # if black side and ally, or red side and enemy,
+                    #   remove it from black's dictionary, add to red's dictionary
+                    else:
+                        self.redMoves[changeR] = None
+                        dictRemove(self.blackMoves, changeB)
+
+        # TODO
+        #   also need to update other methods to take advantage of this collection
+        #   so things that determine which pieces have moves don't need to have long checks?
+
     def gridPos(self, x, y, red):
         """
         Get the value of a position in the grid
@@ -261,10 +332,7 @@ class Game:
         :param red: True if this should get the value from red side, False to get it from black side
         :return: The value
         """
-        if red:
-            return self.redGrid[y][x]
-        else:
-            return self.blackGrid[y][x]
+        return self.redGrid[y][x] if red else self.blackGrid[y][x]
 
     def play(self, pos, modifiers):
         """
@@ -277,15 +345,13 @@ class Game:
             jump: True if this move is a jump, False if it is a normal move
         :return: True if it is now the other players turn, False otherwise
         """
-
         x, y = pos
         left, forward, jump = modifiers
 
         # cannot play at all if the game is not playing
         if not self.win == E_PLAYING:
             return False
-
-        if self.canPlay(pos, modifiers):
+        if self.canPlay(pos, modifiers, self.redTurn):
             newX, newY = movePos(pos, modifiers)
 
             newPiece = self.gridPos(x, y, self.redTurn)
@@ -317,7 +383,7 @@ class Game:
             self.redTurn = not self.redTurn
         return changeTurns
 
-    def canPlay(self, pos, modifiers):
+    def canPlay(self, pos, modifiers, red):
         """
         Determine if a move can be made in the game.
         The move is based on the current turn of the game, ie. if red is moving,
@@ -327,12 +393,13 @@ class Game:
             left: True to move left, False to move Right
             forward: True to move forward, False to move backwards
             jump: True if this move is a jump, False if it is a normal move
+        :param red: True if this is from red's side, False otherwise
         :return True if the piece can make the move, False otherwise
         """
         x, y = pos
         left, forward, jump = modifiers
 
-        if not self.validPiece(x, y, forward):
+        if not self.validPiece(x, y, forward, red):
             return False
 
         # determine directions
@@ -369,21 +436,26 @@ class Game:
             return
 
         # see if no one can make any moves
-        noMoves = True
-        # iterate through rows
-        for j in range(self.height):
-            # iterate through the columns of each row
-            for i in range(self.width):
-                # if the spot is not empty, there might be moves
-                c = self.gridPos(i, j, self.redTurn)
-                if c is not None:
-                    # check if the spot piece is an ally and it has moves
-                    noMoves = not c[0] or not self.canMovePos((i, j))
-                # break out of the loops, a move has been found
-                if not noMoves:
-                    break
-            if not noMoves:
-                break
+        # check if the appropriate moves dictionary is empty
+        #   this is done by checking if the current player's moves dictionary is empty
+        #   noMoves will be evaluate to False if it is empty, True otherwise
+        noMoves = not bool(self.redMoves if self.redTurn else self.blackMoves)
+        # # TODO delete this old code
+        # noMoves = True
+        # # iterate through rows
+        # for j in range(self.height):
+        #     # iterate through the columns of each row
+        #     for i in range(self.width):
+        #         # if the spot is not empty, there might be moves
+        #         c = self.gridPos(i, j, self.redTurn)
+        #         if c is not None:
+        #             # check if the spot piece is an ally and it has moves
+        #             noMoves = not c[0] or not self.canMovePos((i, j), self.redTurn)
+        #         # break out of the loops, a move has been found
+        #         if not noMoves:
+        #             break
+        #     if not noMoves:
+        #         break
 
         # if no one can move, or if no one has any pieces, or
         # if too many moves have happened with no captures, it's a draw
@@ -393,20 +465,22 @@ class Game:
         else:
             self.win = E_PLAYING
 
-    def calculateMoves(self, s):
+    def calculateMoves(self, s, red):
         """
         Given the grid coordinates of a square, determine the list of moves that can be played by that piece.
         :param s: The coordinates of a square
+        :param red: True if the moves should be calculated from red side, False otherwise
         :return The list of moves, a list of 8, 2-tuples, (x, y) of moves that can be taken,
             or None if that move cannot be taken.
-            Coordinates relative to the current players turn
         """
         playMoves = []
         # 8 different possible moves
         for i in range(8):
             bins = moveIntToBoolList(i)
             # check if the move can be played
-            if self.canPlay(s, bins):
+            # TODO might be a way to optimize this by combining the movePos call in canPlay with the
+            #   movePos call in this method
+            if self.canPlay(s, bins, red):
                 # determine the position of the move
                 move = movePos(s, bins)
                 playMoves.append(move)
@@ -414,19 +488,20 @@ class Game:
                 playMoves.append(None)
         return playMoves
 
-    def canMovePos(self, pos):
+    def canMovePos(self, pos, red):
         """
         Determine if a piece at a given grid position has any moves for the current player
         :param pos: The grid position
+        :param red: True if the piece should be considered from red side, False for black sie
         :return: True if a piece at that position has at least one move, False otherwise
         """
-        moves = self.calculateMoves(pos)
+        moves = self.calculateMoves(pos, red)
         for m in moves:
             if m is not None:
                 return True
         return False
 
-    def validPiece(self, x, y, forward):
+    def validPiece(self, x, y, forward, red):
         """
         Given a piece, determine if the piece is valid to move.
         If the piece is empty, then it cannot move.
@@ -436,9 +511,10 @@ class Game:
         :param x: The x coordinate of the piece to check
         :param y: The y coordinate of the piece to check
         :param forward: True if this piece is trying to move forward, False otherwise
+        :param red: True if this piece should be looked at from red side, False for Black side
         :return: True if the piece can move, False otherwise
         """
-        piece = self.gridPos(x, y, self.redTurn)
+        piece = self.gridPos(x, y, red)
         return not (piece is None or (not piece[1] and not forward) or not piece[0])
 
     def inRange(self, x, y):
@@ -513,4 +589,15 @@ def moveIntToBoolList(i):
     :param i: The integer
     :return: The list of 3 boolean values
     """
+    # TODO rework this to not use string manipulation, or do some other faster method
     return [b == '1' for b in "{0:03b}".format(i)]
+
+
+def dictRemove(d, e):
+    """
+    Remove an element from a dictionary, or do nothing if the element is not in the dictionary
+    :param d: The dictionary
+    :param e: The element to remove
+    """
+    if e in d:
+        d.pop(e)

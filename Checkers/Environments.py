@@ -230,7 +230,7 @@ class PieceEnvironment(Environment):
         return s[x + y * self.game.width]
 
     def canTakeAction(self, action):
-        return self.game.canPlay(self.current, moveIntToBoolList(action))
+        return self.game.canPlay(self.current, moveIntToBoolList(action), self.game.redTurn)
 
     def takeAction(self, action):
         if action is None:
@@ -473,7 +473,7 @@ class GameEnvironment(Environment):
 
     def canTakeAction(self, action):
         x, y = self.game.singlePos(action)
-        return self.game.canMovePos((x, y))
+        return self.game.canMovePos((x, y), self.game.redTurn)
 
     def performAction(self, qModel):
         action = qModel.chooseAction(self.toNetInput(), self.canTakeAction)

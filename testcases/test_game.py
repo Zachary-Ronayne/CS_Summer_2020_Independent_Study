@@ -32,6 +32,19 @@ class TestGame(TestCase):
                 self.assertEqual(gRedCol, cRedCol)
                 self.assertEqual(gBlackCol, cBlackCol)
 
+        # verify that the moves lists are the same
+        sorted(game.redMoves)
+        sorted(game.blackMoves)
+        sorted(copy.redMoves)
+        sorted(copy.blackMoves)
+        self.assertEqual(len(copy.redMoves), len(game.redMoves))
+        for moveC, moveG in zip(copy.redMoves, game.redMoves):
+            self.assertEqual(moveC, moveG)
+
+        self.assertEqual(len(copy.blackMoves), len(game.blackMoves))
+        for moveC, moveG in zip(copy.blackMoves, game.blackMoves):
+            self.assertEqual(moveC, moveG)
+
     def test_resetGame(self):
         # create a Game object and reset it
         game = Game(8)
@@ -61,6 +74,21 @@ class TestGame(TestCase):
                 self.assertEqual(red[j + 3][i], None)
                 self.assertEqual(black[j + 3][i], None)
 
+        # verify that both sides contain exactly 4 pieces with moves
+        self.assertEqual(len(game.redMoves), 4)
+        self.assertEqual(len(game.blackMoves), 4)
+
+        # verify that both sides contain the correct piece move locations
+        self.assertTrue((0, 5) in game.redMoves)
+        self.assertTrue((1, 5) in game.redMoves)
+        self.assertTrue((2, 5) in game.redMoves)
+        self.assertTrue((3, 5) in game.redMoves)
+
+        self.assertTrue((0, 5) in game.blackMoves)
+        self.assertTrue((1, 5) in game.blackMoves)
+        self.assertTrue((2, 5) in game.blackMoves)
+        self.assertTrue((3, 5) in game.blackMoves)
+
     def test_clearBoard(self):
         # create a Game and clear the board
         game = Game(8)
@@ -76,8 +104,11 @@ class TestGame(TestCase):
         for i in range(4):
             for j in range(8):
                 self.assertEqual(red[j][i], None)
-
                 self.assertEqual(black[j][i], None)
+
+        # check that sides have no moves
+        self.assertFalse(game.redMoves)
+        self.assertFalse(game.blackMoves)
 
     def test_setBoard(self):
         # create a Game and clear the board, and set some pieces
@@ -159,14 +190,20 @@ class TestGame(TestCase):
         game = Game(8)
         game.clearBoard()
 
+        # verify there are no moves after clearing the board
+        self.assertFalse(game.redMoves)
+        self.assertFalse(game.blackMoves)
+
         # place pieces, and verify they are placed, and that the piece counts are updated
 
         # place a red piece
-        game.spot(0, 0, (True, False), True)
-        self.assertEqual(game.redGrid[0][0], (True, False))
-        self.assertEqual(game.blackGrid[7][3], (False, False))
+        game.spot(0, 0, (True, True), True)
+        self.assertEqual(game.redGrid[0][0], (True, True))
+        self.assertEqual(game.blackGrid[7][3], (False, True))
         self.assertEqual(game.redLeft, 1)
         self.assertEqual(game.blackLeft, 0)
+        self.assertTrue(game.redMoves)
+        self.assertFalse(game.blackMoves)
 
         # place a black piece
         game.spot(2, 4, (True, False), False)
@@ -174,6 +211,8 @@ class TestGame(TestCase):
         self.assertEqual(game.blackGrid[4][2], (True, False))
         self.assertEqual(game.redLeft, 1)
         self.assertEqual(game.blackLeft, 1)
+        self.assertTrue(game.redMoves)
+        self.assertTrue(game.blackMoves)
 
         # replace the red piece with a black piece
         game.spot(3, 7, (True, False), False)
@@ -181,6 +220,8 @@ class TestGame(TestCase):
         self.assertEqual(game.blackGrid[7][3], (True, False))
         self.assertEqual(game.redLeft, 0)
         self.assertEqual(game.blackLeft, 2)
+        self.assertFalse(game.redMoves)
+        self.assertTrue(game.blackMoves)
 
         # remove one of the black pieces
         game.spot(2, 4, None, False)
@@ -188,6 +229,10 @@ class TestGame(TestCase):
         self.assertEqual(game.blackGrid[4][2], None)
         self.assertEqual(game.redLeft, 0)
         self.assertEqual(game.blackLeft, 1)
+        self.assertFalse(game.redMoves)
+        self.assertTrue(game.blackMoves)
+
+        # TODO also test the GUI to make sure it still works
 
     def test_gridPos(self):
         # create a Game
@@ -233,55 +278,55 @@ class TestGame(TestCase):
 
         # testing moving on all basic directions for normal pieces
         game.resetGame()
-        self.assertTrue(game.canPlay((0, 5), (False, True, False)))
-        self.assertFalse(game.canPlay((0, 5), (True, True, False)))
-        self.assertFalse(game.canPlay((0, 5), (False, False, False)))
-        self.assertFalse(game.canPlay((0, 5), (True, False, False)))
-        self.assertFalse(game.canPlay((0, 5), (False, True, True)))
-        self.assertFalse(game.canPlay((0, 5), (True, True, True)))
-        self.assertFalse(game.canPlay((0, 5), (False, False, True)))
-        self.assertFalse(game.canPlay((0, 5), (True, False, True)))
+        self.assertTrue(game.canPlay((0, 5), (False, True, False), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (True, True, False), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (False, False, False), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (True, False, False), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (False, True, True), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (True, True, True), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (False, False, True), game.redTurn))
+        self.assertFalse(game.canPlay((0, 5), (True, False, True), game.redTurn))
 
-        self.assertFalse(game.canPlay((3, 2), (False, True, False)))
-        self.assertFalse(game.canPlay((3, 2), (True, True, False)))
-        self.assertFalse(game.canPlay((3, 2), (False, False, False)))
-        self.assertFalse(game.canPlay((3, 2), (True, False, False)))
-        self.assertFalse(game.canPlay((3, 2), (False, True, True)))
-        self.assertFalse(game.canPlay((3, 2), (True, True, True)))
-        self.assertFalse(game.canPlay((3, 2), (False, False, True)))
-        self.assertFalse(game.canPlay((3, 2), (True, False, True)))
+        self.assertFalse(game.canPlay((3, 2), (False, True, False), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (True, True, False), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (False, False, False), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (True, False, False), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (False, True, True), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (True, True, True), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (False, False, True), game.redTurn))
+        self.assertFalse(game.canPlay((3, 2), (True, False, True), game.redTurn))
 
         # testing jumping with normal pieces
         game.resetGame()
         game.clearBoard()
         game.spot(0, 7, (True, False), True)
         game.spot(0, 6, (False, False), True)
-        self.assertTrue(game.canPlay((0, 7), (False, True, True)))
+        self.assertTrue(game.canPlay((0, 7), (False, True, True), game.redTurn))
         game.spot(0, 6, (True, False), True)
-        self.assertFalse(game.canPlay((0, 7), (False, True, True)))
+        self.assertFalse(game.canPlay((0, 7), (False, True, True), game.redTurn))
         game.spot(0, 6, None, True)
-        self.assertFalse(game.canPlay((0, 7), (False, True, True)))
+        self.assertFalse(game.canPlay((0, 7), (False, True, True), game.redTurn))
 
         # testing jumping with king pieces
         game.resetGame()
         game.clearBoard()
         game.spot(1, 5, (True, True), True)
         game.spot(0, 6, (False, False), True)
-        self.assertTrue(game.canPlay((1, 5), (True, False, True)))
+        self.assertTrue(game.canPlay((1, 5), (True, False, True), game.redTurn))
         game.spot(0, 6, (True, False), True)
-        self.assertFalse(game.canPlay((1, 5), (True, False, True)))
+        self.assertFalse(game.canPlay((1, 5), (True, False, True), game.redTurn))
         game.spot(0, 6, None, True)
-        self.assertFalse(game.canPlay((1, 5), (True, False, True)))
+        self.assertFalse(game.canPlay((1, 5), (True, False, True), game.redTurn))
 
         game.resetGame()
         game.clearBoard()
         game.spot(1, 5, (True, False), True)
         game.spot(0, 6, (False, False), True)
-        self.assertFalse(game.canPlay((1, 5), (True, False, True)))
+        self.assertFalse(game.canPlay((1, 5), (True, False, True), game.redTurn))
         game.spot(0, 6, (True, False), True)
-        self.assertFalse(game.canPlay((1, 5), (True, False, True)))
+        self.assertFalse(game.canPlay((1, 5), (True, False, True), game.redTurn))
         game.spot(0, 6, None, True)
-        self.assertFalse(game.canPlay((1, 5), (True, False, True)))
+        self.assertFalse(game.canPlay((1, 5), (True, False, True), game.redTurn))
 
     def test_checkWinConditions(self):
         # create a Game
@@ -356,14 +401,14 @@ class TestGame(TestCase):
         game = Game(8)
 
         # test finding moves for a default piece
-        moves = game.calculateMoves((0, 5))
+        moves = game.calculateMoves((0, 5), game.redTurn)
         self.assertTrue((0, 4) in moves)
         moves.remove((0, 4))
         for i in range(7):
             self.assertEqual(moves[i], None)
 
         # test finding moves for an empty square
-        moves = game.calculateMoves((0, 4))
+        moves = game.calculateMoves((0, 4), game.redTurn)
         for i in range(8):
             self.assertEqual(moves[i], None)
 
@@ -371,7 +416,7 @@ class TestGame(TestCase):
         game.clearBoard()
         game.spot(1, 2, (True, False), True)
         game.spot(2, 1, (False, False), True)
-        moves = game.calculateMoves((1, 2))
+        moves = game.calculateMoves((1, 2), game.redTurn)
         self.assertTrue((2, 0) in moves)
         moves.remove((2, 0))
         self.assertTrue((1, 1) in moves)
@@ -382,7 +427,7 @@ class TestGame(TestCase):
         # test finding moves for a king on empty board
         game.clearBoard()
         game.spot(1, 2, (True, True), True)
-        moves = game.calculateMoves((1, 2))
+        moves = game.calculateMoves((1, 2), game.redTurn)
         self.assertTrue((1, 1) in moves)
         moves.remove((1, 1))
         self.assertTrue((2, 1) in moves)
@@ -397,7 +442,7 @@ class TestGame(TestCase):
         # test finding moves for a king on empty board in a corner
         game.clearBoard()
         game.spot(0, 0, (True, True), True)
-        moves = game.calculateMoves((0, 0))
+        moves = game.calculateMoves((0, 0), game.redTurn)
         self.assertTrue((1, 1) in moves)
         moves.remove((1, 1))
         self.assertTrue((0, 1) in moves)
@@ -410,7 +455,7 @@ class TestGame(TestCase):
         game.spot(1, 2, (True, True), True)
         game.spot(1, 1, (False, False), True)
         game.spot(1, 3, (False, False), True)
-        moves = game.calculateMoves((1, 2))
+        moves = game.calculateMoves((1, 2), game.redTurn)
         self.assertTrue((0, 0) in moves)
         moves.remove((0, 0))
         self.assertTrue((0, 4) in moves)
@@ -427,37 +472,37 @@ class TestGame(TestCase):
         game = Game(8)
 
         # test ally piece can move, can't move empty square, can't move locked ally, can't move enemy
-        self.assertTrue(game.canMovePos((0, 5)))
-        self.assertFalse(game.canMovePos((0, 4)))
-        self.assertFalse(game.canMovePos((0, 6)))
-        self.assertFalse(game.canMovePos((0, 2)))
+        self.assertTrue(game.canMovePos((0, 5), game.redTurn))
+        self.assertFalse(game.canMovePos((0, 4), game.redTurn))
+        self.assertFalse(game.canMovePos((0, 6), game.redTurn))
+        self.assertFalse(game.canMovePos((0, 2), game.redTurn))
 
         # test kings being able to move backwards, and normal pieces can't
         game.clearBoard()
         game.spot(0, 0, (True, True), True)
-        self.assertTrue(game.canMovePos((0, 0)))
+        self.assertTrue(game.canMovePos((0, 0), game.redTurn))
         game.spot(0, 0, (True, False), True)
-        self.assertFalse(game.canMovePos((0, 0)))
+        self.assertFalse(game.canMovePos((0, 0), game.redTurn))
 
     def test_validPiece(self):
         # create a Game
         game = Game(8)
 
         # test empty square is invalid
-        self.assertFalse(game.validPiece(0, 4, True))
+        self.assertFalse(game.validPiece(0, 4, True, game.redTurn))
 
         # test ally piece is valid
-        self.assertTrue(game.validPiece(0, 5, True))
-        self.assertTrue(game.validPiece(0, 6, True))
+        self.assertTrue(game.validPiece(0, 5, True, game.redTurn))
+        self.assertTrue(game.validPiece(0, 6, True, game.redTurn))
 
         # test enemy piece is invalid
-        self.assertFalse(game.validPiece(0, 1, True))
-        self.assertFalse(game.validPiece(0, 2, True))
+        self.assertFalse(game.validPiece(0, 1, True, game.redTurn))
+        self.assertFalse(game.validPiece(0, 2, True, game.redTurn))
 
         # test king can move backwards, normal can't
-        self.assertFalse(game.validPiece(0, 5, False))
+        self.assertFalse(game.validPiece(0, 5, False, game.redTurn))
         game.spot(0, 5, (True, True), True)
-        self.assertTrue(game.validPiece(0, 5, False))
+        self.assertTrue(game.validPiece(0, 5, False, game.redTurn))
 
     def test_inRange(self):
         # create a Game

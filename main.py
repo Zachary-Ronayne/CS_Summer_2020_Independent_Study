@@ -59,7 +59,7 @@ def testCheckers():
     loadModel = False
 
     # make game
-    game = Game(4)
+    game = Game(8)
 
     env = DuelModel(game, rPieceInner=[200], rGameInner=[500],
                     bPieceInner=[200], bGameInner=[500])
@@ -71,7 +71,7 @@ def testCheckers():
     if loadModel:
         env.load("", DUEL_MODEL_NAME)
 
-    for i in range(0):
+    for i in range(10):
         currentTime = time.time()
         print("Game", str(i))
         print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))
@@ -80,7 +80,7 @@ def testCheckers():
         print(game.string(True))
         print()
 
-    env.trainCollective(10, printGames=True)
+    env.trainCollective(0, printGames=True)
 
     game.resetGame()
 
