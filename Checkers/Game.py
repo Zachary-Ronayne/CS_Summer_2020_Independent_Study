@@ -285,44 +285,69 @@ class Game:
                     self.redLeft -= 1
                 else:
                     self.blackLeft -= 1
+        self.updateMoves(x, y, red)
+
+    def updateMoves(self, x, y, red):
+        """
+        Check all potential pieces located around a specified piece, and update the move dictionaries for both sides
+        :param x: The x coordinate of the piece
+        :param y: The y coordinate of the piece
+        :param red: True if the coordinates are from red side, False for black side
+        """
+        
+        # TODO
+        #   also need to update other methods to take advantage of this collection
+        #   so things that determine which pieces have moves don't need to have long checks?
 
         # TODO reduce and optimize this code
+
+        # TODO optimize code by making another version of this which checks only one space in the loop
+        #   then each of the relevant spaces to check, after self.play is called, will only be checked once
+
         # find all spaces that need to be updated
         spaces = [(x, y)]
         for i in range(8):
             spaces.append(movePos((x, y), moveIntToBoolList(i)))
+
+        # determine if each space has moves
         for s in spaces:
             sx, sy = s
             if self.inRange(sx, sy):
-                sGrid = self.gridPos(sx, sy, red)
-                # determine if each space has moves
-                hasMoves = self.canMovePos(s, red)
                 # if this is from red's side, then change the position directly in the redMoves dictionary
                 #   otherwise use the opposite side, because s is relative to black side
                 changeR = s if red else self.oppositeGrid(s)
                 # do the same, but in reverse for black side
                 changeB = self.oppositeGrid(s) if red else s
-                # if the space has no moves remove that space from both moves lists
-                if not hasMoves:
+
+                # get the piece at the location of s
+                sGrid = self.gridPos(sx, sy, red)
+
+                # if the grid location is None, remove the location from the dictionaries
+                if sGrid is None:
                     dictRemove(self.redMoves, changeR)
                     dictRemove(self.blackMoves, changeB)
-                # if the space is not empty, remove it from the opposite side's moves dictionary,
-                #   and add it to the corresponding side's dictionary
                 else:
-                    # if red side and enemy, or black side and ally,
-                    #   remove it from red's dictionary, add to black's dictionary
-                    if red ^ sGrid[0]:
-                        dictRemove(self.redMoves, changeR)
-                        self.blackMoves[changeB] = None
-                    # if black side and ally, or red side and enemy,
-                    #   remove it from black's dictionary, add to red's dictionary
-                    else:
-                        self.redMoves[changeR] = None
-                        dictRemove(self.blackMoves, changeB)
+                    # determine if each space has moves
+                    hasMoves = self.canMovePos(s if sGrid[0] else self.oppositeGrid(s),
+                                               red if sGrid[0] else not red)
 
-        # TODO
-        #   also need to update other methods to take advantage of this collection
-        #   so things that determine which pieces have moves don't need to have long checks?
+                    # if the space has no moves remove that space from both moves lists
+                    if not hasMoves:
+                        dictRemove(self.redMoves, changeR)
+                        dictRemove(self.blackMoves, changeB)
+                    # if the space is not empty, remove it from the opposite side's moves dictionary,
+                    #   and add it to the corresponding side's dictionary
+                    else:
+                        # if red side and enemy, or black side and ally,
+                        #   remove it from red's dictionary, add to black's dictionary
+                        if red ^ sGrid[0]:
+                            dictRemove(self.redMoves, changeR)
+                            self.blackMoves[changeB] = None
+                        # if black side and ally, or red side and enemy,
+                        #   remove it from black's dictionary, add to red's dictionary
+                        else:
+                            self.redMoves[changeR] = None
+                            dictRemove(self.blackMoves, changeB)
 
     def gridPos(self, x, y, red):
         """
@@ -410,13 +435,13 @@ class Game:
             return False
         # check if the piece jumped over is an enemy
         if jump:
-            jX, jY = movePos(pos, [left, forward, False])
-            pos = self.gridPos(jX, jY, self.redTurn)
+            jX, jY = movePos(pos, (left, forward, False))
+            pos = self.gridPos(jX, jY, red)
             if pos is None or pos[0]:
                 return False
 
         # return if the new position to move to is empty
-        return self.gridPos(newX, newY, self.redTurn) is None
+        return self.gridPos(newX, newY, red) is None
 
     def checkWinConditions(self):
         """
@@ -426,11 +451,11 @@ class Game:
         if not self.win == E_PLAYING:
             return
 
-        # if black has no pieces, red wins
         # if red has no pieces, black wins
         if self.redLeft == 0:
             self.win = E_BLACK_WIN
             return
+        # if black has no pieces, red wins
         elif self.blackLeft == 0:
             self.win = E_RED_WIN
             return
@@ -440,25 +465,9 @@ class Game:
         #   this is done by checking if the current player's moves dictionary is empty
         #   noMoves will be evaluate to False if it is empty, True otherwise
         noMoves = not bool(self.redMoves if self.redTurn else self.blackMoves)
-        # # TODO delete this old code
-        # noMoves = True
-        # # iterate through rows
-        # for j in range(self.height):
-        #     # iterate through the columns of each row
-        #     for i in range(self.width):
-        #         # if the spot is not empty, there might be moves
-        #         c = self.gridPos(i, j, self.redTurn)
-        #         if c is not None:
-        #             # check if the spot piece is an ally and it has moves
-        #             noMoves = not c[0] or not self.canMovePos((i, j), self.redTurn)
-        #         # break out of the loops, a move has been found
-        #         if not noMoves:
-        #             break
-        #     if not noMoves:
-        #         break
 
         # if no one can move, or if no one has any pieces, or
-        # if too many moves have happened with no captures, it's a draw
+        #   if too many moves have happened with no captures, it's a draw
         if noMoves or (self.redLeft == 0 and self.blackLeft == 0) or \
                 self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
             self.win = E_DRAW
@@ -478,12 +487,9 @@ class Game:
         for i in range(8):
             bins = moveIntToBoolList(i)
             # check if the move can be played
-            # TODO might be a way to optimize this by combining the movePos call in canPlay with the
-            #   movePos call in this method
             if self.canPlay(s, bins, red):
                 # determine the position of the move
-                move = movePos(s, bins)
-                playMoves.append(move)
+                playMoves.append(movePos(s, bins))
             else:
                 playMoves.append(None)
         return playMoves
@@ -496,6 +502,7 @@ class Game:
         :return: True if a piece at that position has at least one move, False otherwise
         """
         moves = self.calculateMoves(pos, red)
+
         for m in moves:
             if m is not None:
                 return True
@@ -589,7 +596,6 @@ def moveIntToBoolList(i):
     :param i: The integer
     :return: The list of 3 boolean values
     """
-    # TODO rework this to not use string manipulation, or do some other faster method
     return [b == '1' for b in "{0:03b}".format(i)]
 
 

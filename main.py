@@ -3,28 +3,21 @@
 
 TODO:
 
-Demonstrate intelligent gameplay on 4x4 or 6x6
+Try using convolutional layers
+Try adding adaptive learning rate and discount rate
+Should be no reward for invalid actions, or high negative reward
 
-Improve code when making random moves
+Demonstrate intelligent gameplay on 4x4 or 6x6
 
 Also allow user to train network based on the user's input
     So when the user makes an action, that action should be used for the reward function,
     which trains the network
 
-Speed up general Checkers Game code
-Try using convolutional layers
-Try adding adaptive learning rate and discount rate
-
 Add distance to other pieces as part of the reward
     More reward for nearby pieces
-Should be no reward for invalid actions, or high negative reward
 
-
-In Environments, does there need to be a win condition check?
-In QLearn, try using model(input) using __call__ for potentially better performance
-In GUI, add notification on the screen for a successful or unsuccessful save
-In GUI, reorganize some of the code in handleMouseUp()
-
+Speed up general Checkers Game code
+Improve code when making random moves
 Allow network data outside TensorFlow to be saved, like learning rate and related
 
 """
@@ -59,7 +52,7 @@ def testCheckers():
     loadModel = False
 
     # make game
-    game = Game(8)
+    game = Game(4)
 
     env = DuelModel(game, rPieceInner=[200], rGameInner=[500],
                     bPieceInner=[200], bGameInner=[500])
@@ -71,7 +64,7 @@ def testCheckers():
     if loadModel:
         env.load("", DUEL_MODEL_NAME)
 
-    for i in range(10):
+    for i in range(0):
         currentTime = time.time()
         print("Game", str(i))
         print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))

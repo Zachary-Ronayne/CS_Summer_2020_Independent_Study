@@ -206,10 +206,6 @@ class PieceEnvironment(Environment):
                 # if no move reward was found, then there was no valid reward, so set the reward to None
                 totalReward = None
 
-        # ensure that the win conditions are checked
-        # TODO should this win condition check be here? It should be somewhere else?
-        self.game.checkWinConditions()
-
         # put the game back to it's original state
         self.game = oldGame
         self.gameEnv.game = oldGame

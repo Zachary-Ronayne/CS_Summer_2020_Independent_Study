@@ -242,7 +242,7 @@ class Network(QModel):
 
         # get the outputs of the network at the current state
         # this means finding the Q values for each action in the current state
-        outputs = self.getOutputs()
+        outputs = np.array(self.getOutputs())
 
         # get the reward for taking the given action in the given state
         reward = self.environment.rewardFunc(state, action)
@@ -299,10 +299,7 @@ class Network(QModel):
         Get the output values of the model
         :return: The output values as a numpy array
         """
-
-        # TODO try using self.net(self.getInputs())
-        #   that should give better performance
-        return self.net.predict(self.getInputs(), verbose=0, use_multiprocessing=True, batch_size=None)
+        return self.net(self.getInputs())
 
     def getInputs(self):
         """

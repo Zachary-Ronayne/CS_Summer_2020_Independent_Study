@@ -232,7 +232,37 @@ class TestGame(TestCase):
         self.assertFalse(game.redMoves)
         self.assertTrue(game.blackMoves)
 
-        # TODO also test the GUI to make sure it still works
+    def test_updateMoves(self):
+        # create a Game
+        game = Game(4)
+
+        # check initial move lists
+        self.assertEqual(len(game.redMoves), 2)
+        self.assertTrue((1, 3) in game.redMoves)
+        self.assertTrue((0, 3) in game.redMoves)
+        self.assertEqual(len(game.blackMoves), 2)
+        self.assertTrue((1, 3) in game.blackMoves)
+        self.assertTrue((0, 3) in game.blackMoves)
+
+        # check after one move
+        game.play((0, 3), (False, True, False))
+        game.updateMoves(0, 2, True)
+        self.assertEqual(len(game.redMoves), 2)
+        self.assertTrue((1, 3) in game.redMoves)
+        self.assertTrue((0, 2) in game.redMoves)
+        self.assertEqual(len(game.blackMoves), 2)
+        self.assertTrue((1, 3) in game.blackMoves)
+        self.assertTrue((0, 3) in game.blackMoves)
+
+        # check after a black move
+        game.play((1, 3), (False, True, False))
+        # call updateMoves to ensure the call does not break the moves dictionary
+        game.updateMoves(1, 2, False)
+        self.assertEqual(len(game.redMoves), 2)
+        self.assertTrue((1, 3) in game.redMoves)
+        self.assertTrue((0, 2) in game.redMoves)
+        self.assertEqual(len(game.blackMoves), 1)
+        self.assertTrue((0, 3) in game.blackMoves)
 
     def test_gridPos(self):
         # create a Game
@@ -395,6 +425,15 @@ class TestGame(TestCase):
         game.movesSinceLastCapture = E_MAX_MOVES_WITHOUT_CAPTURE
         game.checkWinConditions()
         self.assertEqual(game.win, E_DRAW)
+
+        # test game where there are moves left, some are blocked
+        game = Game(4)
+        game.resetGame()
+
+        game.play((0, 3), (False, True, False))
+        game.play((1, 3), (False, True, False))
+        game.checkWinConditions()
+        self.assertEqual(E_PLAYING, game.win)
 
     def test_calculateMoves(self):
         # create a Game

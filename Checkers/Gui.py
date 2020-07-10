@@ -8,6 +8,8 @@ import time
 
 # technical constants
 ENABLE_LOOP_WAIT = False
+TICK_RATE = 60
+TICK_TIME = 1.0 / TICK_RATE
 
 E_RED_PLAYING = "Red's Turn"
 E_BLACK_PLAYING = "Black's Turn"
@@ -57,6 +59,13 @@ C_HOVER_HIGHLIGHT = (0, 0, 230, 50)
 C_MOVE_HIGHLIGHT = (0, 200, 0, 127)
 C_CAPTURE_HIGHLIGHT = (200, 0, 0, 127)
 
+# variables for tracking animations
+T_SAVE_TIME = 120
+T_SAVE_TEXT = {True: "Save Successful", False: "Save Failed", None: ""}
+T_SAVE_TEXT_COLOR = {True: (0, 0, 100), False: (100, 0, 0), None: (0, 0, 0)}
+T_SAVE_X = 140
+T_SAVE_Y = 60
+
 
 class Gui:
     """
@@ -91,6 +100,10 @@ class Gui:
         self.fps = fps
         self.printFPS = printFPS
 
+        # variables for tracking save notification
+        self.saveNoteTimer = 0
+        self.saveSuccess = None
+
         # variables for drawing text
         self.font = makeFont(DR_FONT_FACE, DR_FONT_SIZE)
         self.font.set_bold(True)
@@ -113,12 +126,15 @@ class Gui:
         """
         lastTime = time.time()
         lastFrame = time.time()
+        lastTick = time.time()
         frames = 0
         while self.running:
             frameTime = 1 / self.fps
             self.handleEvents()
 
             currTime = time.time()
+
+            # determine if the game should be redrawn
             if currTime - lastFrame > frameTime:
                 frames += 1
                 lastFrame = time.time()
@@ -126,6 +142,13 @@ class Gui:
             elif ENABLE_LOOP_WAIT:
                 # wait a bit of time to prevent the loop from running unnecessarily long amounts of time
                 time.sleep(0.01)
+
+            # determine if the game should be ticked again
+            currTime = time.time()
+            if currTime - lastTick > TICK_TIME:
+                frames += 1
+                lastTick = time.time()
+                self.tick()
 
             currTime = time.time()
             if currTime - lastTime > 1:
@@ -180,7 +203,6 @@ class Gui:
             # if the hover square is nothing, then unselect the square
             # can only move to places where the hover square is not finding a piece
             if self.hoverSquare is None:
-                # TODO may want to move some of this code
                 # select the move to play, based on the mouse location
                 if self.playMoves is not None and self.selectedSquare is not None:
                     # find the square in the grid, based on the mouse position
@@ -231,8 +253,8 @@ class Gui:
             if self.makeQModelMove(explore=0):
                 self.unselectSquare()
         elif k == pygame.K_s:
-            # TODO should add some kind of notification on the screen for successful or failed save
-            self.qDuelModel.save("", DUEL_MODEL_NAME)
+            self.saveNoteTimer = T_SAVE_TIME
+            self.saveSuccess = self.qDuelModel.save("", DUEL_MODEL_NAME)
 
     def makeQModelMove(self, train=False, explore=None):
         """
@@ -322,6 +344,13 @@ class Gui:
                     (move[1] + origin[1]) // 2
                 ))
 
+    def tick(self):
+        """
+        Update variables tracking animations
+        """
+        if self.saveNoteTimer > 0:
+            self.saveNoteTimer -= 1
+
     def redrawPygame(self):
         """
         Draw the current state of the Checkers Game to the pygame window
@@ -371,6 +400,11 @@ class Gui:
         smallFont.set_bold(True)
         for i, text in enumerate(I_TEXT):
             self.drawText(I_UP_LEFT_X, I_UP_LEFT_Y + i * I_LINE_SPACING, text, I_TEXT_COLOR, smallFont)
+
+        # draw save notification
+        if self.saveNoteTimer > 0:
+            self.drawText(T_SAVE_X, T_SAVE_Y, T_SAVE_TEXT[self.saveSuccess],
+                          T_SAVE_TEXT_COLOR[self.saveSuccess], smallFont)
 
         # update display
         pygame.display.update()
