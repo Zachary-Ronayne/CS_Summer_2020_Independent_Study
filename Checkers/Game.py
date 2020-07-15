@@ -1,14 +1,21 @@
+from Constants import E_MAX_MOVES_WITHOUT_CAPTURE
+
 # constants for ending game
 E_PLAYING = 0
 E_RED_WIN = 1
 E_BLACK_WIN = 2
-E_DRAW = 3
-E_MAX_MOVES_WITHOUT_CAPTURE = 25
+E_DRAW_NO_PIECES = 3
+E_DRAW_NO_MOVES_RED = 4
+E_DRAW_NO_MOVES_BLACK = 5
+E_DRAW_TOO_MANY_MOVES = 6
 E_TEXT = [
     "Game In Progress",
     "Red Wins!",
     "Black Wins!",
-    "Draw!"
+    "Draw! No pieces remain",
+    "Draw! Red is out of moves",
+    "Draw! Black is out of moves",
+    "Draw! No capture in " + str(E_MAX_MOVES_WITHOUT_CAPTURE) + " moves"
 ]
 
 # constants for printing the game
@@ -468,9 +475,15 @@ class Game:
 
         # if no one can move, or if no one has any pieces, or
         #   if too many moves have happened with no captures, it's a draw
-        if noMoves or (self.redLeft == 0 and self.blackLeft == 0) or \
-                self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
-            self.win = E_DRAW
+        if noMoves:
+            if self.redTurn:
+                self.win = E_DRAW_NO_MOVES_RED
+            else:
+                self.win = E_DRAW_NO_MOVES_BLACK
+        elif self.redLeft == 0 and self.blackLeft == 0:
+            self.win = E_DRAW_NO_PIECES
+        elif self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
+            self.win = E_DRAW_TOO_MANY_MOVES
         else:
             self.win = E_PLAYING
 
@@ -607,3 +620,12 @@ def dictRemove(d, e):
     """
     if e in d:
         d.pop(e)
+
+
+def isDraw(win):
+    """
+    Determine if the given win value is a draw
+    :param win: The win value
+    :return: True if the win value is a draw, False otherwise
+    """
+    return E_DRAW_NO_PIECES <= win <= E_DRAW_TOO_MANY_MOVES

@@ -1,4 +1,4 @@
-from learning.QLearn import *
+from Checkers.ConvModel import *
 from Checkers.Game import *
 if USE_TENSOR_FLOW:
     from tensorflow.keras.models import load_model
@@ -6,44 +6,13 @@ if USE_TENSOR_FLOW:
 import os.path as path
 import os
 
-# constants for Q Learning models
+
 # number of grids for input of a neural network for the game
 Q_GAME_NUM_GRIDS = 4
-
-# reward for when the game cannot select any pieces to move
-Q_GAME_REWARD_NO_ACTIONS = -1
-
 # number of grids for input of a neural network for a piece in the game
 Q_PIECE_NUM_GRIDS = 6
 # the total number of actions a piece can take
 Q_PIECE_NUM_ACTIONS = 8
-
-# reward when an ally piece moves
-Q_PIECE_REWARD_MOVE = 1
-# reward when an enemy piece moves
-Q_PIECE_REWARD_ENEMY_MOVE = -1
-# reward when a normal enemy piece is captured
-Q_PIECE_REWARD_N_CAPTURE = 30
-# reward when a king enemy piece is captured
-Q_PIECE_REWARD_K_CAPTURE = 40
-# reward when a normal ally piece is captured
-Q_PIECE_REWARD_N_CAPTURED = -10
-# reward when a king ally piece is captured
-Q_PIECE_REWARD_K_CAPTURED = -15
-# reward when an ally piece becomes a king
-Q_PIECE_REWARD_KING = 5
-# reward when an enemy piece becomes a king
-Q_PIECE_REWARD_KINGED = -2
-# reward for winning the game
-Q_PIECE_REWARD_WIN = 1000
-# reward for losing the game
-Q_PIECE_REWARD_LOSE = -2000
-# reward for drawing the game
-Q_PIECE_REWARD_DRAW = -50
-# reward for the game being still in progress
-Q_PIECE_REWARD_PLAYING = 0
-# this value is multiplied by the total number of moves, and added to the reward when the game ends
-Q_PIECE_REWARD_MOVES_FACTOR = -1
 
 
 class PieceEnvironment(Environment):
@@ -68,13 +37,20 @@ class PieceEnvironment(Environment):
         :param enemyEnv: The environment used to make enemy moves. Use None to make the same network used
             for ally and enemy moves. Default None
         """
+
         self.game = game
         self.gameEnv = GameEnvironment(self.game, self)
-        self.gameNetwork = Network(self.game.area(), self.gameEnv,
-                                   inner=[] if gameInner is None else gameInner)
+        if Q_USE_CONVOLUTIONAL_LAYERS:
+            self.gameNetwork = ConvNetwork(self.game.area(), self.gameEnv, self.game, Q_GAME_NUM_GRIDS,
+                                           inner=[] if gameInner is None else gameInner)
+            self.internalNetwork = ConvNetwork(Q_PIECE_NUM_ACTIONS, self, self.game, Q_PIECE_NUM_GRIDS,
+                                               inner=[] if pieceInner is None else pieceInner)
+        else:
+            self.gameNetwork = Network(self.game.area(), self.gameEnv,
+                                       inner=[] if gameInner is None else gameInner)
 
-        self.internalNetwork = Network(Q_PIECE_NUM_ACTIONS, self,
-                                       inner=[] if pieceInner is None else pieceInner)
+            self.internalNetwork = Network(Q_PIECE_NUM_ACTIONS, self,
+                                           inner=[] if pieceInner is None else pieceInner)
 
         self.enemyEnv = enemyEnv
 
@@ -205,6 +181,9 @@ class PieceEnvironment(Environment):
             else:
                 # if no move reward was found, then there was no valid reward, so set the reward to None
                 totalReward = None
+        # if a move cannot be made, ensure win conditions are checked
+        else:
+            self.game.checkWinConditions()
 
         # put the game back to it's original state
         self.game = oldGame
@@ -239,8 +218,6 @@ class PieceEnvironment(Environment):
     def performAction(self, qModel):
         self.gameEnv.performAction(self.gameNetwork)
         net = self.toNetInput()
-        # TODO should this do something in the else case?
-        #   should only happen when no one can make any moves, so normally shouldn't be reached
         if net is not None:
             self.takeAction(qModel.chooseAction(net, self.canTakeAction))
 
@@ -412,7 +389,7 @@ def endGameReward(win, redSide, moves):
     reward = moves * Q_PIECE_REWARD_MOVES_FACTOR
 
     # if the game is a draw, return draw reward
-    if win == E_DRAW:
+    if isDraw(win):
         reward += Q_PIECE_REWARD_DRAW
 
     # if red won and red was playing, or black won and black was playing, add win reward
@@ -456,12 +433,18 @@ class GameEnvironment(Environment):
         # save current value for game
         oldCurrent = self.pieceEnv.current
         self.pieceEnv.current = self.game.singlePos(a)
-        high = None
+        # TODO old code
+        # high = None
+        # for act in range(Q_PIECE_NUM_ACTIONS):
+        #     if self.pieceEnv.canTakeAction(act):
+        #         reward = self.pieceEnv.rewardFunc(s, act)
+        #         if high is None or high < reward:
+        #             high = reward
+
+        high = 0
         for act in range(Q_PIECE_NUM_ACTIONS):
             if self.pieceEnv.canTakeAction(act):
-                reward = self.pieceEnv.rewardFunc(s, act)
-                if high is None or high < reward:
-                    high = reward
+                high += self.pieceEnv.rewardFunc(s, act)
 
         # reset current for game
         self.pieceEnv.current = oldCurrent
@@ -492,27 +475,49 @@ def gameToNetInput(g, current):
     :return: The numpy array
     """
 
-    # get the state of the environment
-    state = g.toList()
+    # TODO this code is probably a source of slowness in the runtime, find a way to reduce this runtime
 
-    # set up an array which can be fed into a network
-    size = g.area()
     gridCount = Q_GAME_NUM_GRIDS if current is None else Q_PIECE_NUM_GRIDS
-    states = np.zeros((1, size * gridCount), dtype=np.int)
-    # go through each element in the state, and set the input array position, corresponding to the
-    #   index of the state and condition of the state
-    for i, s in enumerate(state):
-        x, y = g.singlePos(i)
-        if s is not None:
-            # if the piece is an ally
-            if s[0]:
-                # if the piece is the one selected by Environment
-                if current is not None and (x, y) == current:
-                    index = 5 if s[1] else 4
-                # if it's a normal piece
-                else:
-                    index = 1 if s[1] else 0
-            else:
-                index = 3 if s[1] else 2
-            states[0][index * size + y * g.width + x] = 1
-    return states
+    if Q_USE_CONVOLUTIONAL_LAYERS:
+        states = np.zeros((1, g.height, g.width, gridCount))
+        grid = g.currentGrid()
+        for j, r in enumerate(grid):
+            for i, s in enumerate(r):
+                if s is not None:
+                    states[0][j][i][netInputIndex(s, current, i, j)] = 1
+        return states
+    else:
+        # get the state of the environment
+        state = g.toList()
+
+        # set up an array which can be fed into a network
+        size = g.area()
+        states = np.zeros((1, size * gridCount), dtype=np.int)
+        # go through each element in the state, and set the input array position, corresponding to the
+        #   index of the state and condition of the state
+        for i, s in enumerate(state):
+            x, y = g.singlePos(i)
+            if s is not None:
+                states[0][netInputIndex(s, current, x, y) * size + y * g.width + x] = 1
+        return states
+
+
+def netInputIndex(s, current, x, y):
+    """
+    Helper function for gameToNetInput. Get the index of the list to update
+    :param s: The piece at the position being looked at
+    :param current: The currently selected piece, None if no piece is selected
+    :param x: The x coordinate of the position being looked at
+    :param y: The y coordinate of the position being looked at
+    :return: The index of the list where this piece will be placed in the net input
+    """
+    # if the piece is an ally
+    if s[0]:
+        # if the piece is the one selected by Environment
+        if current is not None and (x, y) == current:
+            return 5 if s[1] else 4
+        # if it's a normal piece
+        else:
+            return 1 if s[1] else 0
+    else:
+        return 3 if s[1] else 2

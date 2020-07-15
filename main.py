@@ -3,9 +3,11 @@
 
 TODO:
 
-Try using convolutional layers
 Try adding adaptive learning rate and discount rate
 Should be no reward for invalid actions, or high negative reward
+
+Add options to change filter size for convolutional layers
+Fix bug where game ends while in progress
 
 Demonstrate intelligent gameplay on 4x4 or 6x6
 
@@ -17,6 +19,9 @@ Add distance to other pieces as part of the reward
     More reward for nearby pieces
 
 Speed up general Checkers Game code
+    specifically the update moves method
+    also optimize code in Environments
+    also code in DuelModel
 Improve code when making random moves
 Allow network data outside TensorFlow to be saved, like learning rate and related
 
@@ -54,8 +59,8 @@ def testCheckers():
     # make game
     game = Game(4)
 
-    env = DuelModel(game, rPieceInner=[200], rGameInner=[500],
-                    bPieceInner=[200], bGameInner=[500])
+    env = DuelModel(game, rPieceInner=[200, 200, 200], rGameInner=[500, 500, 500],
+                    bPieceInner=[200, 200, 200], bGameInner=[500, 500, 500])
     setRates(env.redEnv.internalNetwork)
     setRates(env.redEnv.gameNetwork)
     setRates(env.blackEnv.internalNetwork)
@@ -64,12 +69,12 @@ def testCheckers():
     if loadModel:
         env.load("", DUEL_MODEL_NAME)
 
-    for i in range(0):
+    for i in range(30):
         currentTime = time.time()
         print("Game", str(i))
         print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))
         print("took:", time.time() - currentTime, "seconds")
-        print(E_TEXT[game.win], "final game board:")
+        print(E_TEXT[game.win] + ",", "final game board:")
         print(game.string(True))
         print()
 

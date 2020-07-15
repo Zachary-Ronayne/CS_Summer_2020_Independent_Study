@@ -216,7 +216,6 @@ class Network(QModel):
         """
         Initialize the network to an unlearned, default state
         """
-
         # create a list of layers, initialized with the input layer as the input shape
         layers = [keras.layers.Dense(self.states, activation="sigmoid", use_bias=True,
                                      input_shape=(self.states,))]
@@ -234,7 +233,7 @@ class Network(QModel):
 
         # compile and finish building network
         self.net.compile(optimizer=self.optimizer,
-                         loss=keras.losses.MeanSquaredError())
+                         loss=LOSS_FUNCTION())
 
     def train(self, state, action, takeAction=None):
         # get the state of the game before the move happens
@@ -317,7 +316,7 @@ class Network(QModel):
 
     def updateLearningRate(self, newRate):
         self.learnRate = newRate
-        self.optimizer = keras.optimizers.RMSprop(learning_rate=self.learnRate)
+        self.optimizer = OPTIMIZE_FUNCTION(learning_rate=self.learnRate)
 
     def usesNetwork(self):
         return True
