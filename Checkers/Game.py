@@ -100,9 +100,12 @@ class Game:
 
         return g
 
-    def resetGame(self):
+    def resetGame(self, gameBoard=None):
         """
         Bring the game to the default state at the beginning of the game
+        :param gameBoard: A Game with the pieces in the state where this game should be set to,
+            red still always moves first.
+            Use None to have a normal game. Default None
         """
         # initialize to blank grid
         self.redGrid = []
@@ -124,15 +127,18 @@ class Game:
         self.redMoves = {}
         self.blackMoves = {}
 
-        # fill in each row
-        for y in range(fill):
-            # fill in each spot in the row
-            for x in range(self.width):
-                yy = self.height - 1 - y
-                # add red piece
-                self.spot(x, yy, (True, False), True)
-                # add black piece
-                self.spot(x, yy, (True, False), False)
+        if gameBoard is None:
+            # fill in each row
+            for y in range(fill):
+                # fill in each spot in the row
+                for x in range(self.width):
+                    yy = self.height - 1 - y
+                    # add red piece
+                    self.spot(x, yy, (True, False), True)
+                    # add black piece
+                    self.spot(x, yy, (True, False), False)
+        else:
+            self.setBoard(gameBoard.toList(), True)
 
         # set it to reds turn
         self.redTurn = True

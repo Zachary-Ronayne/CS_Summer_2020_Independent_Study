@@ -3,11 +3,6 @@
 
 TODO:
 
-Fix case where moves are not correcly calculated
-
-Make a simple test game, like there is one correct move to win the game right away for the AI
-    and make sure the AI can win in that simple case
-
 Should be no reward for invalid actions, or high negative reward
     Ensure this is working for both reward functions
 
@@ -42,6 +37,7 @@ os.environ['SDL_VIDEO_CENTERED'] = "1"
 # disable GPU
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
+# True to run the checkers test code, False to run the DummyModel test code
 checkers = True
 
 
@@ -50,10 +46,11 @@ def setRates(model):
     Utility for setting hyperparameters
     """
     model.learnRate = 0.5
-    model.explorationRate = 0.8
+    model.explorationRate = 1.0
     model.discountRate = 0.4
-    model.explorationDecay = 0.95
-    model.learnDecay = 0.95
+
+    model.learnDecay = 0.999
+    model.explorationDecay = 0.99
 
 
 def testCheckers():
@@ -61,11 +58,13 @@ def testCheckers():
     Simple code for playing checkers game
     """
     # for loading in or not loading in the saved version of the Networks
-    loadModel = True
+    loadModel = False
     # number of games to play in training
-    trainGames = 10
+    trainGames = 100
+    # number of games to randomly pick moves and learn all at once
+    collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
-    defaultGameModel = 2
+    defaultGameModel = None
 
     # make game
     game = Game(4)
@@ -86,6 +85,7 @@ def testCheckers():
     defaultGame = Game(4)
     defaultGame.clearBoard()
 
+    # determine the piece locations for the default game
     if defaultGameModel == 0:
         defaultGame.spot(1, 3, (True, False), True)
         defaultGame.spot(0, 2, (False, False), True)
@@ -99,6 +99,7 @@ def testCheckers():
     else:
         defaultGame = None
 
+    # train the appropriate number of times
     for i in range(trainGames):
         currentTime = time.time()
         print("Game", str(i))
@@ -114,15 +115,14 @@ def testCheckers():
         print()
         env.decayModels()
 
-    env.trainCollective(0, printGames=True)
+    # train games where random moves are taken
+    env.trainCollective(collectiveGames, printGames=True)
 
+    # reset the game to the default state
     game.resetGame()
 
-    # for setting the default game with testing
-    if defaultGame is not None:
-        game.setBoard(defaultGame.toList(), True)
-
-    gui = Gui(env, printFPS=False)
+    # set up and begin the gui
+    gui = Gui(env, printFPS=False, defaultGame=defaultGame)
     gui.loop()
 
 

@@ -36,11 +36,7 @@ class DuelModel:
         :return: A 4 tuple (red reward, black reward, red move count, black move count)
         """
 
-        self.game.resetGame()
-
-        # TODO make this an option in the GUI, and move this method to Game
-        if defaultState is not None:
-            self.game.setBoard(defaultState.toList(), True)
+        self.game.resetGame(defaultState)
 
         redTotal, blackTotal, redMoves, blackMoves = 0, 0, 0, 0
 

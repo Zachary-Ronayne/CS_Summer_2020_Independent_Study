@@ -21,7 +21,7 @@ E_GAME_STATE_Y = 10
 DR_SQUARE_SIZE = 80
 DR_BORDER_SIZE = 20
 DR_GAME_BORDER_SIZE = 5
-DR_TOP_SPACE = 150
+DR_TOP_SPACE = 167
 DR_GRID_X = DR_BORDER_SIZE + DR_GAME_BORDER_SIZE
 DR_GRID_Y = DR_BORDER_SIZE + DR_TOP_SPACE + DR_GAME_BORDER_SIZE
 DR_PIECE_SIZE = 70
@@ -36,6 +36,7 @@ I_UP_LEFT_Y = 60
 I_LINE_SPACING = 18
 I_TEXT = [
     "R: reset game",
+    "E: reset game custom",
     "A: make AI move",
     "T: make AI move and train",
     "Q: make AI move without exploring",
@@ -72,16 +73,20 @@ class Gui:
     A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
     """
 
-    def __init__(self, qObject, fps=20, printFPS=False):
+    def __init__(self, qObject, fps=20, printFPS=False, defaultGame=None):
         """
         Create and display the pygame Gui with the given game.
         Must call loop() to make the Gui stay open
         :param qObject: The PieceEnvironment object to use for making an AI move, the Game object also comes from here
         :param fps: The capped frame rate of the Gui, default 20
         :param printFPS: True to print the frames per second, every second, False otherwise, default False
+        :param defaultGame: A custom Game with the pieces in the state where they should start,
+            red still always moves first.
+            Use None to have a normal game. Default None
         """
         self.qDuelModel = qObject
         self.game = qObject.game
+        self.defaultGame = defaultGame
 
         # setup pygame
         pygame.init()
@@ -240,6 +245,9 @@ class Gui:
         k = event.key
         if k == pygame.K_r:
             self.game.resetGame()
+            self.unselectSquare()
+        if k == pygame.K_e:
+            self.game.resetGame(self.defaultGame)
             self.unselectSquare()
         elif k == pygame.K_ESCAPE:
             self.running = False
