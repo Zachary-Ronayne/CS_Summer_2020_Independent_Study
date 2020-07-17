@@ -79,7 +79,7 @@ class PieceEnvironment(Environment):
 
     def rewardFunc(self, s, a):
         # if a move cannot be made, return the reward for that
-        if self.canTakeAction(a):
+        if not self.canTakeAction(a):
             return Q_REWARD_INVALID_ACTION
 
         # initial reward for making a move

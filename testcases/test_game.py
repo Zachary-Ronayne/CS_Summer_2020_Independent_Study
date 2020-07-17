@@ -91,6 +91,20 @@ class TestGame(TestCase):
         self.assertTrue((2, 5) in game.blackMoves)
         self.assertTrue((3, 5) in game.blackMoves)
 
+        # test resetting game with parameter
+        defaultGame = Game(4)
+        defaultGame.clearBoard()
+        defaultGame.spot(1, 3, (True, False), True)
+        defaultGame.spot(0, 2, (False, False), True)
+        game = Game(4)
+        game.resetGame(defaultGame)
+        self.assertEqual(len(game.redMoves), 1)
+        self.assertEqual(len(game.blackMoves), 1)
+        self.assertTrue((1, 3) in game.redMoves)
+        self.assertTrue((1, 1) in game.blackMoves)
+        self.assertEqual(1, game.redLeft)
+        self.assertEqual(1, game.blackLeft)
+
     def test_clearBoard(self):
         # create a Game and clear the board
         game = Game(8)

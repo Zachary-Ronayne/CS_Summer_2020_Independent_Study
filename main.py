@@ -49,14 +49,15 @@ def setRates(model):
     model.explorationRate = 1.0
     model.discountRate = 0.4
 
-    model.learnDecay = 0.999
-    model.explorationDecay = 0.99
+    model.learnDecay = 0.97
+    model.explorationDecay = 0.975
 
 
 def testCheckers():
     """
     Simple code for playing checkers game
     """
+
     # for loading in or not loading in the saved version of the Networks
     loadModel = False
     # number of games to play in training
