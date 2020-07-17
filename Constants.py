@@ -1,5 +1,6 @@
 from tensorflow import keras
 
+# constants for the dummy game
 # indexes for rewards on grid spaces
 MOVE = 0
 GOOD = 1
@@ -28,18 +29,21 @@ CANT_MOVE = 4
 # game constants
 MOVE_COST = 1
 MAX_MOVES = 40
-SIMPLE_BELLMAN = False
 NUM_ACTIONS = 5
 
 # True if the AI should be able to do nothing during a move, or if they have to pick a move that actually moves them
 ENABLE_DO_NOTHING = False
-
 TRACK_MOVE_HISTORY = True
 
-# used to stop importing TensorFlow, should only be used for testing, should be False in any full version
+
+# general constants for Checkers game
+# True to use a simplified Bellman function, False to use the full version
+SIMPLE_BELLMAN = False
+
+# used to stop importing TensorFlow, should only be used for testing, should be True in any full version
 USE_TENSOR_FLOW = True
 
-# used to stop importing Pygame, should only be used for testing, should be False in any full version
+# used to stop importing Pygame, should only be used for testing, should be True in any full version
 USE_PY_GAME = True
 
 # used for saving neural Networks
@@ -54,6 +58,8 @@ OPTIMIZE_FUNCTION = keras.optimizers.SGD
 # the loss function used for Q Networks
 LOSS_FUNCTION = keras.losses.CategoricalCrossentropy
 
+# the reward given when an action cannot be taken
+Q_REWARD_INVALID_ACTION = -50
 
 # constants for Q Learning models
 # reward for when the game cannot select any pieces to move

@@ -27,13 +27,20 @@ class DuelModel:
         """
         return self.redEnv if self.game.redTurn else self.blackEnv
 
-    def playGame(self, printReward=False):
+    def playGame(self, printReward=False, defaultState=None):
         """
         Play a game of checkers using both models, training them separately
-        :return:
+        :param printReward: True to print the reward each time one is obtained, False to not print, default False
+        :param defaultState: A Game with the pieces in the state where they should start, red still always moves first.
+            Use None to have a normal game. Default None
+        :return: A 4 tuple (red reward, black reward, red move count, black move count)
         """
 
         self.game.resetGame()
+
+        # TODO make this an option in the GUI, and move this method to Game
+        if defaultState is not None:
+            self.game.setBoard(defaultState.toList(), True)
 
         redTotal, blackTotal, redMoves, blackMoves = 0, 0, 0, 0
 
@@ -52,6 +59,13 @@ class DuelModel:
                     blackMoves += 1
 
         return redTotal, blackTotal, redMoves, blackMoves
+
+    def decayModels(self):
+        """
+        Apply decay to the networks of both models
+        """
+        self.redEnv.decayNetworks()
+        self.blackEnv.decayNetworks()
 
     def save(self, savePath, name):
         """

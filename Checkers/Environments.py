@@ -78,6 +78,10 @@ class PieceEnvironment(Environment):
         return self if self.enemyEnv is None else self.enemyEnv
 
     def rewardFunc(self, s, a):
+        # if a move cannot be made, return the reward for that
+        if self.canTakeAction(a):
+            return Q_REWARD_INVALID_ACTION
+
         # initial reward for making a move
         totalReward = 0
 
@@ -298,6 +302,13 @@ class PieceEnvironment(Environment):
 
             return reward
 
+    def decayNetworks(self):
+        """
+        Apply the decay to both networks
+        """
+        self.internalNetwork.decayRates()
+        self.gameNetwork.decayRates()
+
     def saveNetworks(self, pieceName, networkName):
         """
         Save both of the QNetwork models used by this PieceEnvironment.
@@ -433,18 +444,17 @@ class GameEnvironment(Environment):
         # save current value for game
         oldCurrent = self.pieceEnv.current
         self.pieceEnv.current = self.game.singlePos(a)
-        # TODO old code
-        # high = None
-        # for act in range(Q_PIECE_NUM_ACTIONS):
-        #     if self.pieceEnv.canTakeAction(act):
-        #         reward = self.pieceEnv.rewardFunc(s, act)
-        #         if high is None or high < reward:
-        #             high = reward
 
         high = 0
-        for act in range(Q_PIECE_NUM_ACTIONS):
-            if self.pieceEnv.canTakeAction(act):
-                high += self.pieceEnv.rewardFunc(s, act)
+        # get the values of each of the possible actions
+        actions = self.pieceEnv.internalNetwork.getOutputs()[0]
+        # for each action, if it can be taken, add that Q value to the total for the reward
+        #   otherwise, add the punishment value for taking that action
+        for i, act in enumerate(actions):
+            if self.pieceEnv.canTakeAction(i):
+                high += act
+            else:
+                high += Q_REWARD_INVALID_ACTION
 
         # reset current for game
         self.pieceEnv.current = oldCurrent

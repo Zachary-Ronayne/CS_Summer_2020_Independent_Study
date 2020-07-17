@@ -3,8 +3,13 @@
 
 TODO:
 
-Try adding adaptive learning rate and discount rate
+Fix case where moves are not correcly calculated
+
+Make a simple test game, like there is one correct move to win the game right away for the AI
+    and make sure the AI can win in that simple case
+
 Should be no reward for invalid actions, or high negative reward
+    Ensure this is working for both reward functions
 
 Add options to change filter size for convolutional layers
 Fix bug where game ends while in progress
@@ -44,9 +49,11 @@ def setRates(model):
     """
     Utility for setting hyperparameters
     """
-    model.learnRate = 0.2
-    model.explorationRate = 0.2
+    model.learnRate = 0.5
+    model.explorationRate = 0.8
     model.discountRate = 0.4
+    model.explorationDecay = 0.95
+    model.learnDecay = 0.95
 
 
 def testCheckers():
@@ -54,11 +61,16 @@ def testCheckers():
     Simple code for playing checkers game
     """
     # for loading in or not loading in the saved version of the Networks
-    loadModel = False
+    loadModel = True
+    # number of games to play in training
+    trainGames = 10
+    # number for the default game to play, use None to just play a normal game
+    defaultGameModel = 2
 
     # make game
     game = Game(4)
 
+    # create the model
     env = DuelModel(game, rPieceInner=[200, 200, 200], rGameInner=[500, 500, 500],
                     bPieceInner=[200, 200, 200], bGameInner=[500, 500, 500])
     setRates(env.redEnv.internalNetwork)
@@ -66,21 +78,49 @@ def testCheckers():
     setRates(env.blackEnv.internalNetwork)
     setRates(env.blackEnv.gameNetwork)
 
+    # load in the model if applicable
     if loadModel:
         env.load("", DUEL_MODEL_NAME)
 
-    for i in range(30):
+    # set up a default game
+    defaultGame = Game(4)
+    defaultGame.clearBoard()
+
+    if defaultGameModel == 0:
+        defaultGame.spot(1, 3, (True, False), True)
+        defaultGame.spot(0, 2, (False, False), True)
+    elif defaultGameModel == 1:
+        defaultGame.spot(1, 3, (True, False), True)
+        defaultGame.spot(0, 1, (False, False), True)
+    elif defaultGameModel == 2:
+        defaultGame.spot(1, 3, (True, False), True)
+        defaultGame.spot(0, 3, (True, False), True)
+        defaultGame.spot(0, 1, (False, False), True)
+    else:
+        defaultGame = None
+
+    for i in range(trainGames):
         currentTime = time.time()
         print("Game", str(i))
-        print("(red, black reward, red, black moves)", str(env.playGame(printReward=False)))
+        print("(red, black reward, red, black moves)", str(
+            env.playGame(printReward=False, defaultState=defaultGame))
+        )
         print("took:", time.time() - currentTime, "seconds")
         print(E_TEXT[game.win] + ",", "final game board:")
         print(game.string(True))
+        print("Current learn rate:", env.redEnv.internalNetwork.learnRate)
+        print("Current explore rate:", env.redEnv.internalNetwork.explorationRate)
+        print("Current discount rate:", env.redEnv.internalNetwork.discountRate)
         print()
+        env.decayModels()
 
     env.trainCollective(0, printGames=True)
 
     game.resetGame()
+
+    # for setting the default game with testing
+    if defaultGame is not None:
+        game.setBoard(defaultGame.toList(), True)
 
     gui = Gui(env, printFPS=False)
     gui.loop()

@@ -13,14 +13,19 @@ class ConvNetwork(Network):
         super().__init__(actions, environment, inner, learnRate, discountRate, explorationRate)
 
     def initNetwork(self):
-        # TODO comment this code, and add options for changing its size
+        # TODO add options for changing its size
+        # determine the dimensions of the sizes of each filter
         convSizes = [(3, 2)] * (self.game.width - 2)
         convSizes.append((4, 2))
 
-        # create a list of layers, the first layer, the input layer, has a specified input_shape
-        layers = [keras.layers.Conv2D(self.actions, c, activation="sigmoid", use_bias=True, data_format='channels_last',
-                                      input_shape=(self.game.height, self.game.width, self.channels)) if i == 0 else
-                  keras.layers.Conv2D(self.inner[i], c, activation="sigmoid", use_bias=True, data_format='channels_last')
+        # create a list of layers, the first layer, ie the input layer, has a specified input_shape
+        layers = [keras.layers.Conv2D(self.actions, c, activation="sigmoid",
+                                      use_bias=True, data_format='channels_last',
+                                      input_shape=(self.game.height, self.game.width, self.channels))
+                  if i == 0 else
+
+                  keras.layers.Conv2D(self.inner[i], c, activation="sigmoid",
+                                      se_bias=True, data_format='channels_last')
 
                   for i, c in enumerate(convSizes)]
 

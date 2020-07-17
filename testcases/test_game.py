@@ -2,6 +2,8 @@ from unittest import TestCase
 
 from Checkers.Environments import *
 
+from Constants import *
+
 
 class TestGame(TestCase):
 
@@ -398,7 +400,7 @@ class TestGame(TestCase):
         game.spot(0, 0, (True, False), True)
         game.spot(0, 0, (True, False), False)
         game.checkWinConditions()
-        self.assertEqual(game.win, E_DRAW)
+        self.assertTrue(isDraw(game.win))
 
         # test game is a draw, it is red's turn and red has no moves,
         #   but both red and black have pieces
@@ -408,7 +410,7 @@ class TestGame(TestCase):
         game.spot(0, 1, (True, False), True)
         game.spot(0, 0, (False, False), True)
         game.checkWinConditions()
-        self.assertEqual(game.win, E_DRAW)
+        self.assertTrue(isDraw(game.win))
 
         # test game is a draw, it is black's turn and black has no moves,
         #   but both red and black have pieces
@@ -418,13 +420,13 @@ class TestGame(TestCase):
         game.spot(0, 1, (True, False), False)
         game.spot(0, 0, (False, False), False)
         game.checkWinConditions()
-        self.assertEqual(game.win, E_DRAW)
+        self.assertTrue(isDraw(game.win))
 
         # test the game is a draw with too many moves since last capture
         game.resetGame()
         game.movesSinceLastCapture = E_MAX_MOVES_WITHOUT_CAPTURE
         game.checkWinConditions()
-        self.assertEqual(game.win, E_DRAW)
+        self.assertTrue(isDraw(game.win))
 
         # test game where there are moves left, some are blocked
         game = Game(4)
@@ -434,6 +436,23 @@ class TestGame(TestCase):
         game.play((1, 3), (False, True, False))
         game.checkWinConditions()
         self.assertEqual(E_PLAYING, game.win)
+
+        # test game where the only black piece is blocked
+        game = Game(4)
+        game.clearBoard()
+        self.assertFalse(game.redMoves)
+        self.assertFalse(game.blackMoves)
+
+        game.spot(1, 3, (True, False), True)
+        game.spot(0, 3, (True, False), True)
+        game.spot(0, 1, (False, False), True)
+        self.assertTrue(game.redMoves)
+        self.assertTrue(game.blackMoves)
+
+        game.play((0, 3), (False, True, False))
+        self.assertTrue(game.redMoves)
+        self.assertFalse(game.blackMoves)
+        self.assertEqual(game.win, E_DRAW_NO_MOVES_BLACK)
 
     def test_calculateMoves(self):
         # create a Game

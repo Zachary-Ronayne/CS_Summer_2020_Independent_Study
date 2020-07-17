@@ -149,8 +149,7 @@ class Game:
         for y in range(self.height):
             # fill in each spot in the row
             for x in range(self.width):
-                yy = self.height - 1 - y
-                self.spot(x, yy, None, True)
+                self.spot(x, y, None, True)
 
     def setBoard(self, pieceList, red):
         """
@@ -404,15 +403,16 @@ class Game:
             self.movesSinceLastCapture += 1
             self.moves += 1
 
-            # see if the game is over
-            self.checkWinConditions()
-
             changeTurns = not jump
         else:
             changeTurns = False
 
         if changeTurns:
             self.redTurn = not self.redTurn
+
+        # see if the game is over
+        self.checkWinConditions()
+
         return changeTurns
 
     def canPlay(self, pos, modifiers, red):
@@ -480,10 +480,10 @@ class Game:
                 self.win = E_DRAW_NO_MOVES_RED
             else:
                 self.win = E_DRAW_NO_MOVES_BLACK
-        elif self.redLeft == 0 and self.blackLeft == 0:
-            self.win = E_DRAW_NO_PIECES
         elif self.movesSinceLastCapture >= E_MAX_MOVES_WITHOUT_CAPTURE:
             self.win = E_DRAW_TOO_MANY_MOVES
+        elif self.redLeft == 0 and self.blackLeft == 0:
+            self.win = E_DRAW_NO_PIECES
         else:
             self.win = E_PLAYING
 

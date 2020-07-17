@@ -19,7 +19,8 @@ class QModel:
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, states, actions, environment, learnRate=0.1, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, states, actions, environment, learnRate=0.1, discountRate=0.5, explorationRate=0.5,
+                 learnDecay=1.0, discountDecay=1.0, explorationDecay=1.0):
         """
         Create a QModel with the given parameters
         :param states: The number of states
@@ -28,6 +29,9 @@ class QModel:
         and potential reward
         :param learnRate: The learning rate of the table
         :param discountRate: The discount rate of the table
+        :param learnDecay: The rate at which learning rate decreases, use 1.0 to turn off decay, default 1.0
+        :param discountDecay: The rate at which discount rate decreases, use 1.0 to turn off decay, default 1.0
+        :param explorationDecay: The rate at which exploration rate decreases, use 1.0 to turn off decay, default 1.0
         """
         self.states = states
         self.actions = actions
@@ -37,6 +41,18 @@ class QModel:
         self.learnRate = learnRate
         self.discountRate = discountRate
         self.explorationRate = explorationRate
+
+        self.learnDecay = learnDecay
+        self.discountDecay = discountDecay
+        self.explorationDecay = explorationDecay
+
+    def decayRates(self):
+        """
+        Apply decay to the learning rate, exploration rate, and discount rate
+        """
+        self.learnRate *= self.learnDecay
+        self.discountRate *= self.discountDecay
+        self.explorationRate *= self.explorationDecay
 
     def chooseAction(self, state, takeAction=None):
         """
