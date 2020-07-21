@@ -82,7 +82,7 @@ Q_PIECE_REWARD_KING = 5
 # reward when an enemy piece becomes a king
 Q_PIECE_REWARD_KINGED = -2
 # reward for winning the game
-Q_PIECE_REWARD_WIN = 1000
+Q_PIECE_REWARD_WIN = 100000
 # reward for losing the game
 Q_PIECE_REWARD_LOSE = -2000
 # reward for drawing the game
@@ -99,4 +99,4 @@ Q_USE_CONVOLUTIONAL_LAYERS = True
 
 # used by Game for the maximum moves which can be made without a capture,
 #   before a game ends in a draw
-E_MAX_MOVES_WITHOUT_CAPTURE = 25
+E_MAX_MOVES_WITHOUT_CAPTURE = 50

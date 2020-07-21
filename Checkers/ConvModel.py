@@ -25,7 +25,7 @@ class ConvNetwork(Network):
                   if i == 0 else
 
                   keras.layers.Conv2D(self.inner[i], c, activation="sigmoid",
-                                      se_bias=True, data_format='channels_last')
+                                      use_bias=True, data_format='channels_last')
 
                   for i, c in enumerate(convSizes)]
 

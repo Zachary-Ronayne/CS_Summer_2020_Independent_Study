@@ -81,15 +81,15 @@ class TestGame(TestCase):
         self.assertEqual(len(game.blackMoves), 4)
 
         # verify that both sides contain the correct piece move locations
-        self.assertTrue((0, 5) in game.redMoves)
-        self.assertTrue((1, 5) in game.redMoves)
-        self.assertTrue((2, 5) in game.redMoves)
-        self.assertTrue((3, 5) in game.redMoves)
+        self.assertTrue(game.toSinglePos(0, 5) in game.redMoves)
+        self.assertTrue(game.toSinglePos(1, 5) in game.redMoves)
+        self.assertTrue(game.toSinglePos(2, 5) in game.redMoves)
+        self.assertTrue(game.toSinglePos(3, 5) in game.redMoves)
 
-        self.assertTrue((0, 5) in game.blackMoves)
-        self.assertTrue((1, 5) in game.blackMoves)
-        self.assertTrue((2, 5) in game.blackMoves)
-        self.assertTrue((3, 5) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(0, 5) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(1, 5) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(2, 5) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(3, 5) in game.blackMoves)
 
         # test resetting game with parameter
         defaultGame = Game(4)
@@ -100,8 +100,8 @@ class TestGame(TestCase):
         game.resetGame(defaultGame)
         self.assertEqual(len(game.redMoves), 1)
         self.assertEqual(len(game.blackMoves), 1)
-        self.assertTrue((1, 3) in game.redMoves)
-        self.assertTrue((1, 1) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.redMoves)
+        self.assertTrue(game.toSinglePos(1, 1) in game.blackMoves)
         self.assertEqual(1, game.redLeft)
         self.assertEqual(1, game.blackLeft)
 
@@ -254,31 +254,58 @@ class TestGame(TestCase):
 
         # check initial move lists
         self.assertEqual(len(game.redMoves), 2)
-        self.assertTrue((1, 3) in game.redMoves)
-        self.assertTrue((0, 3) in game.redMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.redMoves)
+        self.assertTrue(game.toSinglePos(0, 3) in game.redMoves)
         self.assertEqual(len(game.blackMoves), 2)
-        self.assertTrue((1, 3) in game.blackMoves)
-        self.assertTrue((0, 3) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(0, 3) in game.blackMoves)
 
         # check after one move
         game.play((0, 3), (False, True, False))
         game.updateMoves(0, 2, True)
         self.assertEqual(len(game.redMoves), 2)
-        self.assertTrue((1, 3) in game.redMoves)
-        self.assertTrue((0, 2) in game.redMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.redMoves)
+        self.assertTrue(game.toSinglePos(0, 2) in game.redMoves)
         self.assertEqual(len(game.blackMoves), 2)
-        self.assertTrue((1, 3) in game.blackMoves)
-        self.assertTrue((0, 3) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(0, 3) in game.blackMoves)
 
         # check after a black move
         game.play((1, 3), (False, True, False))
         # call updateMoves to ensure the call does not break the moves dictionary
         game.updateMoves(1, 2, False)
         self.assertEqual(len(game.redMoves), 2)
-        self.assertTrue((1, 3) in game.redMoves)
-        self.assertTrue((0, 2) in game.redMoves)
+        self.assertTrue(game.toSinglePos(1, 3) in game.redMoves)
+        self.assertTrue(game.toSinglePos(0, 2) in game.redMoves)
         self.assertEqual(len(game.blackMoves), 1)
-        self.assertTrue((0, 3) in game.blackMoves)
+        self.assertTrue(game.toSinglePos(0, 3) in game.blackMoves)
+
+    def test_updateOneMove(self):
+        # create a Game
+        game = Game(8)
+
+        game.resetGame()
+        game.clearBoard()
+        self.assertEqual(0, len(game.redMoves))
+        self.assertEqual(0, len(game.blackMoves))
+
+        game.spot(2, 4, (True, False), True, False)
+        self.assertEqual(0, len(game.redMoves))
+        self.assertEqual(0, len(game.blackMoves))
+
+        game.updateOneMove((2, 4), True)
+        self.assertEqual(1, len(game.redMoves))
+        self.assertIn(game.toSinglePos(2, 4), game.redMoves)
+        self.assertEqual(0, len(game.blackMoves))
+
+        game.spot(2, 4, None, True, False)
+        self.assertEqual(1, len(game.redMoves))
+        self.assertIn(game.toSinglePos(2, 4), game.redMoves)
+        self.assertEqual(0, len(game.blackMoves))
+
+        game.updateOneMove((2, 4), True)
+        self.assertEqual(0, len(game.redMoves))
+        self.assertEqual(0, len(game.blackMoves))
 
     def test_gridPos(self):
         # create a Game
@@ -625,11 +652,49 @@ class TestGame(TestCase):
 
     def test_moveIntToBoolList(self):
         # verify each number
-        self.assertEqual(moveIntToBoolList(0), [False, False, False])
-        self.assertEqual(moveIntToBoolList(1), [False, False, True])
-        self.assertEqual(moveIntToBoolList(2), [False, True, False])
-        self.assertEqual(moveIntToBoolList(3), [False, True, True])
-        self.assertEqual(moveIntToBoolList(4), [True, False, False])
-        self.assertEqual(moveIntToBoolList(5), [True, False, True])
-        self.assertEqual(moveIntToBoolList(6), [True, True, False])
-        self.assertEqual(moveIntToBoolList(7), [True, True, True])
+        self.assertEqual(moveIntToBoolList(0), (False, False, False))
+        self.assertEqual(moveIntToBoolList(1), (False, False, True))
+        self.assertEqual(moveIntToBoolList(2), (False, True, False))
+        self.assertEqual(moveIntToBoolList(3), (False, True, True))
+        self.assertEqual(moveIntToBoolList(4), (True, False, False))
+        self.assertEqual(moveIntToBoolList(5), (True, False, True))
+        self.assertEqual(moveIntToBoolList(6), (True, True, False))
+        self.assertEqual(moveIntToBoolList(7), (True, True, True))
+
+    def test_addDiagMoves(self):
+        # check all moves on right diagonal
+        moves = []
+        addDiagMoves(True, moves, (1, 4), True, True)
+        self.assertEqual(len(moves), 4)
+        self.assertIn((0, 2), moves)
+        self.assertIn((1, 3), moves)
+        self.assertIn((2, 5), moves)
+        self.assertIn((2, 6), moves)
+
+        # check all moves on left diagonal
+        moves = []
+        addDiagMoves(False, moves, (1, 4), True, True)
+        self.assertEqual(len(moves), 4)
+        self.assertIn((2, 2), moves)
+        self.assertIn((2, 3), moves)
+        self.assertIn((1, 5), moves)
+        self.assertIn((0, 6), moves)
+
+        # check all moves on the top
+        moves = []
+        addDiagMoves(False, moves, (1, 4), False, True)
+        self.assertEqual(len(moves), 2)
+        self.assertIn((2, 2), moves)
+        self.assertIn((2, 3), moves)
+
+        # check all moves on the bottom
+        moves = []
+        addDiagMoves(False, moves, (1, 4), True, False)
+        self.assertEqual(len(moves), 2)
+        self.assertIn((1, 5), moves)
+        self.assertIn((0, 6), moves)
+
+        # check all moves when checking none
+        moves = []
+        addDiagMoves(False, moves, (1, 4), False, False)
+        self.assertEqual(len(moves), 0)

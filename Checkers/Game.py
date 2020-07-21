@@ -86,6 +86,9 @@ class Game:
         g.redLeft = self.redLeft
         g.blackLeft = self.blackLeft
 
+        # TODO do a direct memory copy
+        #   allocate all memory first
+
         g.redGrid = []
         g.blackGrid = []
         for rr, rb in zip(self.redGrid, self.blackGrid):
@@ -139,6 +142,7 @@ class Game:
                     self.spot(x, yy, (True, False), False)
         else:
             self.setBoard(gameBoard.toList(), True)
+            self.checkWinConditions()
 
         # set it to reds turn
         self.redTurn = True
@@ -258,13 +262,15 @@ class Game:
         """
         return self.width * self.height
 
-    def spot(self, x, y, value, red):
+    def spot(self, x, y, value, red, update=True):
         """
         Set the value at a position in the grid
         :param x: The x coordinate
         :param y: The y coordinate
         :param value: The new value
         :param red: True if this should access from Red side, False otherwise
+        :param update: True to also check the moves at this position to check for new moves of surrounding pieces
+            False to not check, default True
         """
 
         oldSpace = self.gridPos(x, y, red)
@@ -297,7 +303,9 @@ class Game:
                     self.redLeft -= 1
                 else:
                     self.blackLeft -= 1
-        self.updateMoves(x, y, red)
+
+        if update:
+            self.updateMoves(x, y, red)
 
     def updateMoves(self, x, y, red):
         """
@@ -306,15 +314,6 @@ class Game:
         :param y: The y coordinate of the piece
         :param red: True if the coordinates are from red side, False for black side
         """
-        
-        # TODO
-        #   also need to update other methods to take advantage of this collection
-        #   so things that determine which pieces have moves don't need to have long checks?
-
-        # TODO reduce and optimize this code
-
-        # TODO optimize code by making another version of this which checks only one space in the loop
-        #   then each of the relevant spaces to check, after self.play is called, will only be checked once
 
         # find all spaces that need to be updated
         spaces = [(x, y)]
@@ -323,43 +322,54 @@ class Game:
 
         # determine if each space has moves
         for s in spaces:
-            sx, sy = s
-            if self.inRange(sx, sy):
-                # if this is from red's side, then change the position directly in the redMoves dictionary
-                #   otherwise use the opposite side, because s is relative to black side
-                changeR = s if red else self.oppositeGrid(s)
-                # do the same, but in reverse for black side
-                changeB = self.oppositeGrid(s) if red else s
+            self.updateOneMove(s, red)
 
-                # get the piece at the location of s
-                sGrid = self.gridPos(sx, sy, red)
+    def updateOneMove(self, s, red):
+        """
+        Update the moves list for a given space. Essentially, determine if a piece at a particular position
+            can move, and if it can, update it's corresponding moves list
+        :param s: The space to check
+        :param red: True if s is from red's perspective, False for black's perspective
+        """
+        sx, sy = s
+        if self.inRange(sx, sy):
+            # if this is from red's side, then change the position directly in the redMoves dictionary
+            #   otherwise use the opposite side, because s is relative to black side
+            changeR = s if red else self.oppositeGrid(s)
+            changeR = self.toSinglePos(changeR[0], changeR[1])
+            # do the same, but in reverse for black side
+            changeB = self.oppositeGrid(s) if red else s
+            changeB = self.toSinglePos(changeB[0], changeB[1])
 
-                # if the grid location is None, remove the location from the dictionaries
-                if sGrid is None:
+            # get the piece at the location of s
+            sGrid = self.gridPos(sx, sy, red)
+
+            # if the grid location is None, remove the location from the dictionaries
+            if sGrid is None:
+                dictRemove(self.redMoves, changeR)
+                dictRemove(self.blackMoves, changeB)
+            else:
+                # determine if each space has moves
+                hasMoves = self.canMovePos(s if sGrid[0] else self.oppositeGrid(s),
+                                           red if sGrid[0] else not red)
+
+                # if the space has no moves remove that space from both moves lists
+                if not hasMoves:
                     dictRemove(self.redMoves, changeR)
                     dictRemove(self.blackMoves, changeB)
+                # if the space is not empty, remove it from the opposite side's moves dictionary,
+                #   and add it to the corresponding side's dictionary
                 else:
-                    # determine if each space has moves
-                    hasMoves = self.canMovePos(s if sGrid[0] else self.oppositeGrid(s),
-                                               red if sGrid[0] else not red)
-
-                    # if the space has no moves remove that space from both moves lists
-                    if not hasMoves:
+                    # if red side and enemy, or black side and ally,
+                    #   remove it from red's dictionary, add to black's dictionary
+                    if red ^ sGrid[0]:
                         dictRemove(self.redMoves, changeR)
-                        dictRemove(self.blackMoves, changeB)
-                    # if the space is not empty, remove it from the opposite side's moves dictionary,
-                    #   and add it to the corresponding side's dictionary
+                        self.blackMoves[changeB] = None
+                    # if black side and ally, or red side and enemy,
+                    #   remove it from black's dictionary, add to red's dictionary
                     else:
-                        # if red side and enemy, or black side and ally,
-                        #   remove it from red's dictionary, add to black's dictionary
-                        if red ^ sGrid[0]:
-                            dictRemove(self.redMoves, changeR)
-                            self.blackMoves[changeB] = None
-                        # if black side and ally, or red side and enemy,
-                        #   remove it from black's dictionary, add to red's dictionary
-                        else:
-                            self.redMoves[changeR] = None
-                            dictRemove(self.blackMoves, changeB)
+                        self.redMoves[changeR] = None
+                        dictRemove(self.blackMoves, changeB)
 
     def gridPos(self, x, y, red):
         """
@@ -389,7 +399,8 @@ class Game:
         if not self.win == E_PLAYING:
             return False
         if self.canPlay(pos, modifiers, self.redTurn):
-            newX, newY = movePos(pos, modifiers)
+            newPos = movePos(pos, modifiers)
+            newX, newY = newPos
 
             newPiece = self.gridPos(x, y, self.redTurn)
 
@@ -397,13 +408,40 @@ class Game:
             if newY == 0:
                 newPiece = (newPiece[0], True)
 
-            self.spot(newX, newY, newPiece, self.redTurn)
-            self.spot(x, y, None, self.redTurn)
+            # set the grid positions for where the piece was, and where the piece moved to
+            self.spot(newX, newY, newPiece, self.redTurn, False)
+            self.spot(x, y, None, self.redTurn, False)
+            # add those positions to a list for updating moves lists
+            updates = [newPos, pos]
+
+            # determine if the move happened from bottom left to upper right, True
+            #   or upper left to lower left, False
+            rightDiag = x <= newX and y > newY or x >= newX and y < newY
+
+            # add the moves to check for the main diagonals of the new and old position
+            addDiagMoves(rightDiag, updates, pos, True, True)
+            addDiagMoves(rightDiag, updates, newPos, True, True)
+
+            # add the moves to check for for the half diagonals
+            small = (pos, newPos) if y < newY else (newPos, pos)
+            small, big = small
+            addDiagMoves(rightDiag, updates, small, True, False)
+            addDiagMoves(rightDiag, updates, big, False, True)
+
             # a capture has happened
             if jump:
                 self.movesSinceLastCapture = 0
-                jX, jY = movePos(pos, [left, forward, False])
-                self.spot(jX, jY, None, self.redTurn)
+                mPos = movePos(pos, (left, forward, False))
+                jX, jY = mPos
+                self.spot(jX, jY, None, self.redTurn, False)
+
+                # when a jump happens, update the diagonal on the piece that was jumped over
+                updates.append(mPos)
+                addDiagMoves(rightDiag, updates, mPos, True, True)
+
+            # update the moves list based on each position checked
+            for m in updates:
+                self.updateOneMove(m, self.redTurn)
 
             # update number of moves
             self.movesSinceLastCapture += 1
@@ -615,7 +653,13 @@ def moveIntToBoolList(i):
     :param i: The integer
     :return: The list of 3 boolean values
     """
-    return [b == '1' for b in "{0:03b}".format(i)]
+    # not using loops or append because this is faster, and this method only needs to work for integers in range [0-7]
+    num1 = i % 2 == 1
+    i //= 2
+    num2 = i % 2 == 1
+    i //= 2
+    num3 = i % 2 == 1
+    return num3, num2, num1
 
 
 def dictRemove(d, e):
@@ -635,3 +679,20 @@ def isDraw(win):
     :return: True if the win value is a draw, False otherwise
     """
     return E_DRAW_NO_PIECES <= win <= E_DRAW_TOO_MANY_MOVES
+
+
+def addDiagMoves(rightDiag, moveList, pos, down, up):
+    """
+    Helper method for Play. Add to moveList, all of the positions which can be moved on a diagonal
+    :param rightDiag: True if this diagonal, in grid space, goes from lower left to upper right, False otherwise
+    :param moveList: The list to add the moves
+    :param pos: The position to start at
+    :param down: True to add moves going down, False otherwise
+    :param up: True to add moves going up, False otherwise
+    """
+    if up:
+        moveList.append(movePos(pos, (rightDiag, True, False)))
+        moveList.append(movePos(pos, (rightDiag, True, True)))
+    if down:
+        moveList.append(movePos(pos, (not rightDiag, False, False)))
+        moveList.append(movePos(pos, (not rightDiag, False, True)))

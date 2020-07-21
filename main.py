@@ -3,11 +3,16 @@
 
 TODO:
 
-Should be no reward for invalid actions, or high negative reward
-    Ensure this is working for both reward functions
+Try saving move history
+
+Look up python profiler
+    https://docs.python.org/3/library/profile.html
+
+Automate changing hyperparameters
 
 Add options to change filter size for convolutional layers
-Fix bug where game ends while in progress
+Fix bug where game ends while in progress, only happens during training
+    should be fixed, was a result checking win conditions at the wrong time from the wrong side
 
 Demonstrate intelligent gameplay on 4x4 or 6x6
 
@@ -47,7 +52,7 @@ def setRates(model):
     """
     model.learnRate = 0.5
     model.explorationRate = 1.0
-    model.discountRate = 0.4
+    model.discountRate = 0.9
 
     model.learnDecay = 0.97
     model.explorationDecay = 0.975
@@ -61,7 +66,7 @@ def testCheckers():
     # for loading in or not loading in the saved version of the Networks
     loadModel = False
     # number of games to play in training
-    trainGames = 100
+    trainGames = 50
     # number of games to randomly pick moves and learn all at once
     collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
@@ -94,9 +99,20 @@ def testCheckers():
         defaultGame.spot(1, 3, (True, False), True)
         defaultGame.spot(0, 1, (False, False), True)
     elif defaultGameModel == 2:
-        defaultGame.spot(1, 3, (True, False), True)
+        defaultGame.spot(1, 2, (True, False), True)
         defaultGame.spot(0, 3, (True, False), True)
         defaultGame.spot(0, 1, (False, False), True)
+    elif defaultGameModel == 3:
+        defaultGame.spot(0, 0, (False, False), False)
+        defaultGame.spot(0, 0, (False, False), True)
+    elif defaultGameModel == 4:
+        defaultGame.spot(0, 0, (False, False), False)
+        defaultGame.spot(0, 0, (False, False), True)
+        defaultGame.spot(1, 0, (False, False), True)
+    elif defaultGameModel == 5:
+        defaultGame.spot(0, 0, (False, False), True)
+        defaultGame.spot(0, 0, (False, False), False)
+        defaultGame.spot(1, 0, (False, False), False)
     else:
         defaultGame = None
 
@@ -108,7 +124,7 @@ def testCheckers():
             env.playGame(printReward=False, defaultState=defaultGame))
         )
         print("took:", time.time() - currentTime, "seconds")
-        print(E_TEXT[game.win] + ",", "final game board:")
+        print(E_TEXT[game.win], "| Final game board:")
         print(game.string(True))
         print("Current learn rate:", env.redEnv.internalNetwork.learnRate)
         print("Current explore rate:", env.redEnv.internalNetwork.explorationRate)
