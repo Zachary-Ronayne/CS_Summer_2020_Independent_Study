@@ -82,11 +82,11 @@ Q_PIECE_REWARD_KING = 5
 # reward when an enemy piece becomes a king
 Q_PIECE_REWARD_KINGED = -2
 # reward for winning the game
-Q_PIECE_REWARD_WIN = 100000
+Q_PIECE_REWARD_WIN = 2000
 # reward for losing the game
-Q_PIECE_REWARD_LOSE = -2000
+Q_PIECE_REWARD_LOSE = -1000
 # reward for drawing the game
-Q_PIECE_REWARD_DRAW = -50
+Q_PIECE_REWARD_DRAW = -50000
 # reward for the game being still in progress
 Q_PIECE_REWARD_PLAYING = 0
 # this value is multiplied by the total number of moves, and added to the reward when the game ends

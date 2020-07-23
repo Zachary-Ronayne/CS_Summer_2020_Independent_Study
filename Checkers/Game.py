@@ -399,9 +399,12 @@ class Game:
         if not self.win == E_PLAYING:
             return False
         if self.canPlay(pos, modifiers, self.redTurn):
+            # get position where the piece will move to
             newPos = movePos(pos, modifiers)
+            # unpack that position
             newX, newY = newPos
 
+            # determine the piece at the location which is making a move
             newPiece = self.gridPos(x, y, self.redTurn)
 
             # set the piece to a king if it reaches the end
@@ -416,17 +419,17 @@ class Game:
 
             # determine if the move happened from bottom left to upper right, True
             #   or upper left to lower left, False
-            rightDiag = x <= newX and y > newY or x >= newX and y < newY
+            rightDiag = left ^ forward
 
             # add the moves to check for the main diagonals of the new and old position
-            addDiagMoves(rightDiag, updates, pos, True, True)
-            addDiagMoves(rightDiag, updates, newPos, True, True)
+            addDiagMoves(not rightDiag, updates, newPos, True, True)
+            addDiagMoves(not rightDiag, updates, pos, True, True)
 
             # add the moves to check for for the half diagonals
             small = (pos, newPos) if y < newY else (newPos, pos)
             small, big = small
-            addDiagMoves(rightDiag, updates, small, True, False)
-            addDiagMoves(rightDiag, updates, big, False, True)
+            addDiagMoves(rightDiag, updates, big, True, False)
+            addDiagMoves(rightDiag, updates, small, False, True)
 
             # a capture has happened
             if jump:
@@ -442,7 +445,6 @@ class Game:
             # update the moves list based on each position checked
             for m in updates:
                 self.updateOneMove(m, self.redTurn)
-
             # update number of moves
             self.movesSinceLastCapture += 1
             self.moves += 1
@@ -678,6 +680,7 @@ def isDraw(win):
     :param win: The win value
     :return: True if the win value is a draw, False otherwise
     """
+    # TODO make this different constants defined with the draw constants for the range
     return E_DRAW_NO_PIECES <= win <= E_DRAW_TOO_MANY_MOVES
 
 
@@ -691,8 +694,8 @@ def addDiagMoves(rightDiag, moveList, pos, down, up):
     :param up: True to add moves going up, False otherwise
     """
     if up:
-        moveList.append(movePos(pos, (rightDiag, True, False)))
-        moveList.append(movePos(pos, (rightDiag, True, True)))
+        moveList.append(movePos(pos, (not rightDiag, True, False)))
+        moveList.append(movePos(pos, (not rightDiag, True, True)))
     if down:
-        moveList.append(movePos(pos, (not rightDiag, False, False)))
-        moveList.append(movePos(pos, (not rightDiag, False, True)))
+        moveList.append(movePos(pos, (rightDiag, False, False)))
+        moveList.append(movePos(pos, (rightDiag, False, True)))

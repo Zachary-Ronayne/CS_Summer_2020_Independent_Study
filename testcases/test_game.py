@@ -495,6 +495,134 @@ class TestGame(TestCase):
         self.assertFalse(game.blackMoves)
         self.assertEqual(game.win, E_DRAW_NO_MOVES_BLACK)
 
+        # test game where black has moves, and red has no moves
+        game = Game(4)
+        game.clearBoard()
+        self.assertFalse(game.redMoves)
+        self.assertFalse(game.blackMoves)
+
+        game.spot(0, 0, (True, True), True, update=True)
+        game.spot(1, 2, (True, False), True, update=True)
+        game.spot(0, 1, (False, True), True, update=True)
+        game.spot(1, 1, (False, False), True, update=True)
+
+        self.assertFalse(game.redMoves)
+        self.assertEqual(2, len(game.blackMoves))
+
+        # now test the same game, but playing to get the moves
+        gameP = Game(4)
+        gameP.resetGame()
+        self.assertIn(6, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertIn(7, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        # play a move, verify the correct pieces have moves
+        gameP.play((0, 3), (False, True, False))
+        self.assertIn(4, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertIn(7, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((1, 3), (True, True, False))
+        self.assertIn(4, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(4, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(1, len(gameP.blackMoves))
+
+        gameP.play((0, 2), (True, True, False))
+        self.assertIn(2, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(4, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(1, len(gameP.blackMoves))
+
+        gameP.play((0, 2), (False, True, False))
+        self.assertIn(2, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((0, 1), (False, True, False))
+        self.assertIn(0, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((1, 1), (False, True, False))
+        self.assertIn(0, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(1, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((0, 0), (True, False, False))
+        self.assertIn(2, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(1, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((1, 0), (True, False, False))
+        self.assertIn(2, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((0, 1), (False, True, False))
+        self.assertIn(0, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertIn(6, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((0, 3), (False, True, False))
+        self.assertIn(0, gameP.redMoves)
+        self.assertIn(7, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertIn(4, gameP.blackMoves)
+        self.assertEqual(2, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+
+        gameP.play((1, 3), (False, True, False))
+        self.assertIn(0, gameP.redMoves)
+        self.assertIn(3, gameP.blackMoves)
+        self.assertEqual(1, len(gameP.redMoves))
+        self.assertEqual(1, len(gameP.blackMoves))
+
+        gameP.play((1, 1), (False, False, False))
+
+        # verify both versions are the same, from playing and directly placing pieces
+        pList = gameP.toList()
+        gList = game.toList()
+        for p, g in zip(pList, gList):
+            self.assertEqual(p, g)
+
+        # verify correct number of pieces remaining
+        self.assertEqual(2, gameP.redLeft)
+        self.assertEqual(2, gameP.blackLeft)
+
+        # verify the correct moves and end state
+        self.assertIn(4, gameP.blackMoves)
+        self.assertIn(5, gameP.blackMoves)
+        self.assertEqual(0, len(gameP.redMoves))
+        self.assertEqual(2, len(gameP.blackMoves))
+        self.assertEqual(E_DRAW_NO_MOVES_RED, gameP.win)
+
     def test_calculateMoves(self):
         # create a Game
         game = Game(8)
@@ -664,7 +792,7 @@ class TestGame(TestCase):
     def test_addDiagMoves(self):
         # check all moves on right diagonal
         moves = []
-        addDiagMoves(True, moves, (1, 4), True, True)
+        addDiagMoves(False, moves, (1, 4), True, True)
         self.assertEqual(len(moves), 4)
         self.assertIn((0, 2), moves)
         self.assertIn((1, 3), moves)
@@ -673,7 +801,7 @@ class TestGame(TestCase):
 
         # check all moves on left diagonal
         moves = []
-        addDiagMoves(False, moves, (1, 4), True, True)
+        addDiagMoves(True, moves, (1, 4), True, True)
         self.assertEqual(len(moves), 4)
         self.assertIn((2, 2), moves)
         self.assertIn((2, 3), moves)
@@ -682,14 +810,14 @@ class TestGame(TestCase):
 
         # check all moves on the top
         moves = []
-        addDiagMoves(False, moves, (1, 4), False, True)
+        addDiagMoves(True, moves, (1, 4), False, True)
         self.assertEqual(len(moves), 2)
         self.assertIn((2, 2), moves)
         self.assertIn((2, 3), moves)
 
         # check all moves on the bottom
         moves = []
-        addDiagMoves(False, moves, (1, 4), True, False)
+        addDiagMoves(True, moves, (1, 4), True, False)
         self.assertEqual(len(moves), 2)
         self.assertIn((1, 5), moves)
         self.assertIn((0, 6), moves)

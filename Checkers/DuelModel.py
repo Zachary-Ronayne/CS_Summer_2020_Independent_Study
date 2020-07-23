@@ -42,6 +42,7 @@ class DuelModel:
 
         # play the game until it's over
         while self.game.win == E_PLAYING:
+
             turn = self.game.redTurn
             reward = self.currentEnvironment().playGameMove(printReward)
             if reward is None:

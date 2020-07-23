@@ -2,11 +2,12 @@
 """
 
 TODO:
-
 Try saving move history
 
 Look up python profiler
     https://docs.python.org/3/library/profile.html
+
+Try using a list instead of a dictionary to track moves
 
 Automate changing hyperparameters
 
@@ -54,8 +55,8 @@ def setRates(model):
     model.explorationRate = 1.0
     model.discountRate = 0.9
 
-    model.learnDecay = 0.97
-    model.explorationDecay = 0.975
+    model.learnDecay = 1  # 0.97
+    model.explorationDecay = 1  # 0.975
 
 
 def testCheckers():
@@ -66,7 +67,7 @@ def testCheckers():
     # for loading in or not loading in the saved version of the Networks
     loadModel = False
     # number of games to play in training
-    trainGames = 50
+    trainGames = 0
     # number of games to randomly pick moves and learn all at once
     collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
