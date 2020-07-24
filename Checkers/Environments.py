@@ -93,8 +93,6 @@ class PieceEnvironment(Environment):
 
         # make moves until it is the enemy's turn, or the game ends
         while redTurn == newState.redTurn and newState.win == E_PLAYING:
-            print("loop1")  # TODO
-            print(newState.string(True))  # TODO
             r = self.oneActionReward(newState, a, redTurn)
             if r is None:
                 break
@@ -107,13 +105,6 @@ class PieceEnvironment(Environment):
 
         # continue to make moves, until it is again the original player's turn, or the game ends
         while not redTurn == newState.redTurn and newState.win == E_PLAYING:
-            print("loop2", redTurn, newState.redTurn, newState.win)  # TODO
-            print(newState.redLeft, newState.blackLeft)  # TODO
-            print(newState.redMoves)  # TODO
-            print(newState.blackMoves)  # TODO
-            print(newState.string(True))  # TODO
-            print()  # TODO
-
             r = env.oneActionReward(newState, None, redTurn)
             if r is None:
                 break

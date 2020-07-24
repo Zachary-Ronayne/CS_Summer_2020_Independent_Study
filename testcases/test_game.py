@@ -826,3 +826,53 @@ class TestGame(TestCase):
         moves = []
         addDiagMoves(False, moves, (1, 4), False, False)
         self.assertEqual(len(moves), 0)
+
+    def test_calculateUpdatePieces(self):
+        updates = calculateUpdatePieces((2, 4), (1, 2), (2, 3), (True, True, True))
+        self.assertEqual(19, len(updates))
+
+        self.assertIn((1, 2), updates)
+        self.assertIn((2, 3), updates)
+        self.assertIn((2, 4), updates)
+
+        self.assertIn((0, 0), updates)
+        self.assertIn((1, 1), updates)
+
+        self.assertIn((3, 5), updates)
+        self.assertIn((3, 6), updates)
+
+        self.assertIn((1, 3), updates)
+        self.assertIn((0, 4), updates)
+        self.assertIn((1, 4), updates)
+        self.assertIn((1, 5), updates)
+        self.assertIn((2, 5), updates)
+        self.assertIn((1, 6), updates)
+
+        self.assertIn((2, 1), updates)
+        self.assertIn((2, 0), updates)
+        self.assertIn((2, 2), updates)
+        self.assertIn((3, 1), updates)
+        self.assertIn((3, 3), updates)
+        self.assertIn((3, 2), updates)
+
+        updates = calculateUpdatePieces((1, 6), (2, 5), None, (False, True, False))
+        self.assertEqual(14, len(updates))
+
+        self.assertIn((1, 6), updates)
+        self.assertIn((2, 5), updates)
+
+        self.assertIn((2, 4), updates)
+        self.assertIn((3, 3), updates)
+
+        self.assertIn((1, 7), updates)
+        self.assertIn((0, 8), updates)
+
+        self.assertIn((1, 5), updates)
+        self.assertIn((0, 4), updates)
+        self.assertIn((1, 4), updates)
+        self.assertIn((1, 3), updates)
+
+        self.assertIn((2, 7), updates)
+        self.assertIn((2, 8), updates)
+        self.assertIn((2, 6), updates)
+        self.assertIn((3, 7), updates)

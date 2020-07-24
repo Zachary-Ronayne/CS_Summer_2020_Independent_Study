@@ -8,6 +8,8 @@ E_DRAW_NO_PIECES = 3
 E_DRAW_NO_MOVES_RED = 4
 E_DRAW_NO_MOVES_BLACK = 5
 E_DRAW_TOO_MANY_MOVES = 6
+E_DRAW_MIN = E_DRAW_NO_PIECES
+E_DRAW_MAX = E_DRAW_TOO_MANY_MOVES
 E_TEXT = [
     "Game In Progress",
     "Red Wins!",
@@ -414,22 +416,6 @@ class Game:
             # set the grid positions for where the piece was, and where the piece moved to
             self.spot(newX, newY, newPiece, self.redTurn, False)
             self.spot(x, y, None, self.redTurn, False)
-            # add those positions to a list for updating moves lists
-            updates = [newPos, pos]
-
-            # determine if the move happened from bottom left to upper right, True
-            #   or upper left to lower left, False
-            rightDiag = left ^ forward
-
-            # add the moves to check for the main diagonals of the new and old position
-            addDiagMoves(not rightDiag, updates, newPos, True, True)
-            addDiagMoves(not rightDiag, updates, pos, True, True)
-
-            # add the moves to check for for the half diagonals
-            small = (pos, newPos) if y < newY else (newPos, pos)
-            small, big = small
-            addDiagMoves(rightDiag, updates, big, True, False)
-            addDiagMoves(rightDiag, updates, small, False, True)
 
             # a capture has happened
             if jump:
@@ -437,10 +423,10 @@ class Game:
                 mPos = movePos(pos, (left, forward, False))
                 jX, jY = mPos
                 self.spot(jX, jY, None, self.redTurn, False)
+            else:
+                mPos = None
 
-                # when a jump happens, update the diagonal on the piece that was jumped over
-                updates.append(mPos)
-                addDiagMoves(rightDiag, updates, mPos, True, True)
+            updates = calculateUpdatePieces(pos, newPos, mPos, modifiers)
 
             # update the moves list based on each position checked
             for m in updates:
@@ -680,8 +666,7 @@ def isDraw(win):
     :param win: The win value
     :return: True if the win value is a draw, False otherwise
     """
-    # TODO make this different constants defined with the draw constants for the range
-    return E_DRAW_NO_PIECES <= win <= E_DRAW_TOO_MANY_MOVES
+    return E_DRAW_MIN <= win <= E_DRAW_MAX
 
 
 def addDiagMoves(rightDiag, moveList, pos, down, up):
@@ -699,3 +684,47 @@ def addDiagMoves(rightDiag, moveList, pos, down, up):
     if down:
         moveList.append(movePos(pos, (rightDiag, False, False)))
         moveList.append(movePos(pos, (rightDiag, False, True)))
+
+
+def calculateUpdatePieces(pos, newPos, mPos, modifiers):
+    """
+    Helper method for Game.play
+    etermine all of the positions that must be checked after a spot on
+    the grid is changed, to ensure that the pieces around the changed square are updated with any
+    changes to their possible moves.
+    :param pos: The position of the piece before it was moved
+    :param newPos: The position of the piece after it was moved
+    :param mPos: The position of the piece that was jumped over, or None if a jump did not happen
+    :param modifiers: The standard modifiers for how the piece moved, a 3-tuple of (left, forward, jump)
+    :return: A list of all the positions that must be checked
+    """
+    # TODO make test cases
+
+    # unpack tuples
+    left, forward, jump = modifiers
+    x, y = pos
+    newX, newY = newPos
+
+    # add the base positions to a list for updating moves lists
+    updates = [newPos, pos]
+
+    # determine if the move happened from bottom left to upper right, True
+    #   or upper left to lower left, False
+    rightDiag = left ^ forward
+
+    # add the moves to check for the main diagonals of the new and old position
+    addDiagMoves(not rightDiag, updates, newPos, True, True)
+    addDiagMoves(not rightDiag, updates, pos, True, True)
+
+    # add the moves to check for for the half diagonals
+    small = (pos, newPos) if y < newY else (newPos, pos)
+    small, big = small
+    addDiagMoves(rightDiag, updates, big, True, False)
+    addDiagMoves(rightDiag, updates, small, False, True)
+
+    # if a capture has happened, update the diagonal on the piece that was jumped over
+    if jump:
+        updates.append(mPos)
+        addDiagMoves(not rightDiag, updates, mPos, True, True)
+
+    return updates
