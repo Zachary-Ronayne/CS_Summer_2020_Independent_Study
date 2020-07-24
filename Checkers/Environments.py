@@ -126,6 +126,10 @@ class PieceEnvironment(Environment):
         :return: The reward for making the move, or None if no action could be taken
         """
 
+        # TODO this is the main bottleneck for the neural network learning part
+        #   the only way to speed this up, would be to reduce the number of calls to networks
+        #   or optimize how the networks are called
+
         # TODO also need to make it possible for a player to train the network
         #   The environment should make a move and remember the state and action for that move
         #   Then when the player makes a move, that is the move used for determining the next
@@ -484,8 +488,6 @@ def gameToNetInput(g, current):
         None to not include the grids representing controlled pieces
     :return: The numpy array
     """
-
-    # TODO this code is probably a source of slowness in the runtime, find a way to reduce this runtime
 
     gridCount = Q_GAME_NUM_GRIDS if current is None else Q_PIECE_NUM_GRIDS
     if Q_USE_CONVOLUTIONAL_LAYERS:

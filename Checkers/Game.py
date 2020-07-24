@@ -88,9 +88,6 @@ class Game:
         g.redLeft = self.redLeft
         g.blackLeft = self.blackLeft
 
-        # TODO do a direct memory copy
-        #   allocate all memory first
-
         g.redGrid = []
         g.blackGrid = []
         for rr, rb in zip(self.redGrid, self.blackGrid):
@@ -359,6 +356,7 @@ class Game:
                 if not hasMoves:
                     dictRemove(self.redMoves, changeR)
                     dictRemove(self.blackMoves, changeB)
+
                 # if the space is not empty, remove it from the opposite side's moves dictionary,
                 #   and add it to the corresponding side's dictionary
                 else:
@@ -367,6 +365,7 @@ class Game:
                     if red ^ sGrid[0]:
                         dictRemove(self.redMoves, changeR)
                         self.blackMoves[changeB] = None
+
                     # if black side and ally, or red side and enemy,
                     #   remove it from black's dictionary, add to red's dictionary
                     else:
@@ -503,7 +502,7 @@ class Game:
         # check if the appropriate moves dictionary is empty
         #   this is done by checking if the current player's moves dictionary is empty
         #   noMoves will be evaluate to False if it is empty, True otherwise
-        noMoves = not bool(self.redMoves if self.redTurn else self.blackMoves)
+        noMoves = len(self.redMoves if self.redTurn else self.blackMoves) == 0
 
         # if no one can move, or if no one has any pieces, or
         #   if too many moves have happened with no captures, it's a draw
@@ -698,7 +697,6 @@ def calculateUpdatePieces(pos, newPos, mPos, modifiers):
     :param modifiers: The standard modifiers for how the piece moved, a 3-tuple of (left, forward, jump)
     :return: A list of all the positions that must be checked
     """
-    # TODO make test cases
 
     # unpack tuples
     left, forward, jump = modifiers
@@ -728,3 +726,18 @@ def calculateUpdatePieces(pos, newPos, mPos, modifiers):
         addDiagMoves(not rightDiag, updates, mPos, True, True)
 
     return updates
+
+
+def stringifyPlayMove(pos, modifiers, name="game"):
+    """
+    A utility method for automating getting code for playing moves.
+    Helpful for generating code for testing particular cases of moves made.
+    Can be used with things like the GUI or moves made by the QModels to replicate exact board states
+        without having to manually place every piece.
+    Parameters work in the same way as are passed to Game.play and Game.canPlay
+    :param pos: The position of the piece to move
+    :param modifiers: A 3-tuple of the modifiers (left, forward, jump) for the piece to move
+    :param name: The variable name of the game that this play method call will use
+    :return A string representing the code used to make the move
+    """
+    return name + ".play(" + str(pos) + ", " + str(modifiers) + ")"

@@ -111,8 +111,6 @@ class DuelModel:
         pieceRewards = [[]] * 2
         gameRewards = [[]] * 2
 
-        # TODO generally improve this code
-
         # do this games number of times
         for i in range(games):
             # reset the game

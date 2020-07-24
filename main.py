@@ -2,18 +2,10 @@
 """
 
 TODO:
-Try saving move history
-
-Look up python profiler
-    https://docs.python.org/3/library/profile.html
-
-Try using a list instead of a dictionary to track moves
-
-Automate changing hyperparameters
 
 Add options to change filter size for convolutional layers
-Fix bug where game ends while in progress, only happens during training
-    should be fixed, was a result checking win conditions at the wrong time from the wrong side
+
+Automate changing hyperparameters
 
 Demonstrate intelligent gameplay on 4x4 or 6x6
 
@@ -24,11 +16,6 @@ Also allow user to train network based on the user's input
 Add distance to other pieces as part of the reward
     More reward for nearby pieces
 
-Speed up general Checkers Game code
-    specifically the update moves method
-    also optimize code in Environments
-    also code in DuelModel
-Improve code when making random moves
 Allow network data outside TensorFlow to be saved, like learning rate and related
 
 """
@@ -69,11 +56,11 @@ def testCheckers():
     # number of games to play in training
     trainGames = 0
     # number of games to randomly pick moves and learn all at once
-    collectiveGames = 1
+    collectiveGames = 100
     # number for the default game to play, use None to just play a normal game
     defaultGameModel = None
     # the size od the grid to play
-    gameSize = 4
+    gameSize = 8
 
     # make game
     game = Game(gameSize)

@@ -28,4 +28,4 @@ def testCode():
     game.play((1, 1), (False, False, False))
 
 
-print(timeit.timeit(lambda: testCode(), number=500))
+print(timeit.timeit(lambda: testCode(), number=10000))
