@@ -151,11 +151,11 @@ class DuelModel:
                 gameStates[turn].append(gameInput[0])
 
                 # determine the action rewards, and save them
-                reward = env.gameNetwork.getOutputs()
+                reward = np.array(env.gameNetwork.getOutputs())
                 reward[0][gameAction] = env.gameEnv.rewardFunc(state, gameAction)
                 gameRewards[turn].append(reward[0])
 
-                reward = env.internalNetwork.getOutputs()
+                reward = np.array(env.internalNetwork.getOutputs())
                 reward[0][pieceAction] = env.rewardFunc(state, pieceAction)
                 pieceRewards[turn].append(reward[0])
 

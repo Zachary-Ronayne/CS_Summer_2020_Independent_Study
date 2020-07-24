@@ -2,12 +2,7 @@
 """
 
 TODO:
-Fix bug where win conditions are not correctly calculated
-    separate some code from playGame, and make lots of test cases for it
-
 Try saving move history
-
-Fix train collective method
 
 Look up python profiler
     https://docs.python.org/3/library/profile.html
@@ -72,13 +67,13 @@ def testCheckers():
     # for loading in or not loading in the saved version of the Networks
     loadModel = False
     # number of games to play in training
-    trainGames = 200
+    trainGames = 0
     # number of games to randomly pick moves and learn all at once
-    collectiveGames = 0
+    collectiveGames = 1
     # number for the default game to play, use None to just play a normal game
     defaultGameModel = None
     # the size od the grid to play
-    gameSize = 8
+    gameSize = 4
 
     # make game
     game = Game(gameSize)
