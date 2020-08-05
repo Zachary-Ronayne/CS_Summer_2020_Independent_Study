@@ -252,6 +252,18 @@ class Network(QModel):
                          loss=LOSS_FUNCTION())
 
     def train(self, state, action, takeAction=None):
+        return self.trainReward(state, action, None, takeAction)
+
+    def trainReward(self, state, action, reward, takeAction=None):
+        """
+        Same as normal train function, but the reward can be given, rather than calculated.
+        This method will take an action in the environment
+        :param state: The state of the environment before the action is made
+        :param action: The action to make
+        :param reward: The reward for taking the action, or None to calculate the reward
+        :param takeAction: Function to determine if an action can be taken, or None, default None
+        :return: True if the training was successful, False otherwise
+        """
         # get the state of the game before the move happens
         inputs = self.getInputs()
 
@@ -259,8 +271,8 @@ class Network(QModel):
         # this means finding the Q values for each action in the current state
         outputs = np.array(self.getOutputs())
 
-        # get the reward for taking the given action in the given state
-        reward = self.environment.rewardFunc(state, action)
+        if reward is None:
+            reward = self.environment.rewardFunc(state, action)
 
         # make next step in environment, meaning take the action
         self.environment.takeAction(action)
@@ -293,7 +305,6 @@ class Network(QModel):
             expectedOut[0, action] = expectedOut[0, action] + self.learnRate * (
                 reward - expectedOut[0, action] +
                 self.discountRate * maxOutput)
-
         # train the network on the newly expected Q values
         self.net.fit(inputs, expectedOut, verbose=0, use_multiprocessing=True, epochs=1, batch_size=None)
 

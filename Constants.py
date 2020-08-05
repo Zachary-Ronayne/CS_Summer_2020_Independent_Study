@@ -54,43 +54,43 @@ DUEL_MODEL_NAME = "duel model"
 
 
 # the optimization function used for Q Networks
-OPTIMIZE_FUNCTION = keras.optimizers.SGD
+OPTIMIZE_FUNCTION = keras.optimizers.Adam
 # the loss function used for Q Networks
-LOSS_FUNCTION = keras.losses.CategoricalCrossentropy
+LOSS_FUNCTION = keras.losses.MeanSquaredError
 
 # the reward given when an action cannot be taken
-Q_REWARD_INVALID_ACTION = -50
+Q_REWARD_INVALID_ACTION = -.1
 
 # constants for Q Learning models
 # reward for when the game cannot select any pieces to move
-Q_GAME_REWARD_NO_ACTIONS = -1
+Q_GAME_REWARD_NO_ACTIONS = -.1
 
 # reward when an ally piece moves
-Q_PIECE_REWARD_MOVE = 1
+Q_PIECE_REWARD_MOVE = .0001
 # reward when an enemy piece moves
-Q_PIECE_REWARD_ENEMY_MOVE = -1
+Q_PIECE_REWARD_ENEMY_MOVE = -.0001
 # reward when a normal enemy piece is captured
-Q_PIECE_REWARD_N_CAPTURE = 30
+Q_PIECE_REWARD_N_CAPTURE = .2
 # reward when a king enemy piece is captured
-Q_PIECE_REWARD_K_CAPTURE = 40
+Q_PIECE_REWARD_K_CAPTURE = .2
 # reward when a normal ally piece is captured
-Q_PIECE_REWARD_N_CAPTURED = -10
+Q_PIECE_REWARD_N_CAPTURED = -.4
 # reward when a king ally piece is captured
-Q_PIECE_REWARD_K_CAPTURED = -15
+Q_PIECE_REWARD_K_CAPTURED = -.45
 # reward when an ally piece becomes a king
-Q_PIECE_REWARD_KING = 5
+Q_PIECE_REWARD_KING = .005
 # reward when an enemy piece becomes a king
-Q_PIECE_REWARD_KINGED = -2
+Q_PIECE_REWARD_KINGED = -.002
 # reward for winning the game
-Q_PIECE_REWARD_WIN = 2000
+Q_PIECE_REWARD_WIN = .2
 # reward for losing the game
-Q_PIECE_REWARD_LOSE = -1000
+Q_PIECE_REWARD_LOSE = -.1
 # reward for drawing the game
-Q_PIECE_REWARD_DRAW = -50000
+Q_PIECE_REWARD_DRAW = -.1
 # reward for the game being still in progress
 Q_PIECE_REWARD_PLAYING = 0
 # this value is multiplied by the total number of moves, and added to the reward when the game ends
-Q_PIECE_REWARD_MOVES_FACTOR = -1
+Q_PIECE_REWARD_MOVES_FACTOR = 0.001
 
 # True to use convolutional layers for all neural networks with the Checkers Game Environments
 #   False to use feed forward networks

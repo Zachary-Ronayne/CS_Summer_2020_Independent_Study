@@ -636,7 +636,7 @@ def movePos(pos, modifiers):
 
 def moveIntToBoolList(i):
     """
-    Convert an integer in the range [0-7] to a list of 3 boolean values, corresponding to the binary representation
+    Convert an integer in the range [0, 7] to a list of 3 boolean values, corresponding to the binary representation
     :param i: The integer
     :return: The list of 3 boolean values
     """
@@ -647,6 +647,16 @@ def moveIntToBoolList(i):
     i //= 2
     num3 = i % 2 == 1
     return num3, num2, num1
+
+
+def boolListToInt(bools):
+    """
+    Convert a list of 3 booleans into an integer in the range [0, 7]
+    :param bools: The list of booleans
+    :return: The integer
+    """
+    # not using loops for optimized speed at this size
+    return 4 * bools[0] + 2 * bools[1] + 1 * bools[2]
 
 
 def dictRemove(d, e):
@@ -688,7 +698,7 @@ def addDiagMoves(rightDiag, moveList, pos, down, up):
 def calculateUpdatePieces(pos, newPos, mPos, modifiers):
     """
     Helper method for Game.play
-    etermine all of the positions that must be checked after a spot on
+    Determine all of the positions that must be checked after a spot on
     the grid is changed, to ensure that the pieces around the changed square are updated with any
     changes to their possible moves.
     :param pos: The position of the piece before it was moved

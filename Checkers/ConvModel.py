@@ -13,7 +13,6 @@ class ConvNetwork(Network):
         super().__init__(actions, environment, inner, learnRate, discountRate, explorationRate)
 
     def initNetwork(self):
-        # TODO add options for changing its size
         # determine the dimensions of the sizes of each filter
         convSizes = [(3, 2)] * (self.game.width - 2)
         convSizes.append((4, 2))
@@ -21,11 +20,15 @@ class ConvNetwork(Network):
         # create a list of layers, the first layer, ie the input layer, has a specified input_shape
         layers = [keras.layers.Conv2D(self.actions, c, activation="sigmoid",
                                       use_bias=True, data_format='channels_last',
-                                      input_shape=(self.game.height, self.game.width, self.channels))
+                                      input_shape=(self.game.height, self.game.width, self.channels),
+                                      kernel_initializer=tf.keras.initializers.RandomUniform(-1, 1, None),
+                                      bias_initializer=tf.keras.initializers.RandomUniform(-1, 1, None))
                   if i == 0 else
 
                   keras.layers.Conv2D(self.inner[i], c, activation="sigmoid",
-                                      use_bias=True, data_format='channels_last')
+                                      use_bias=True, data_format='channels_last',
+                                      kernel_initializer=tf.keras.initializers.RandomUniform(-1, 1, None),
+                                      bias_initializer=tf.keras.initializers.RandomUniform(-1, 1, None))
 
                   for i, c in enumerate(convSizes)]
 
@@ -37,7 +40,7 @@ class ConvNetwork(Network):
 
         # compile and finish building network
         self.net.compile(optimizer=self.optimizer,
-                         loss=keras.losses.MeanSquaredError())
+                         loss=LOSS_FUNCTION())
 
     def getActions(self, s):
         # get the actions

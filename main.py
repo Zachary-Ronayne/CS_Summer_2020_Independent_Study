@@ -3,26 +3,33 @@
 
 TODO:
 
-Add options to change filter size for convolutional layers
+In QLearn, test out the dummy model with a non convolutional network
+    it doesn't seem to predict anything correctly
 
 Automate changing hyperparameters
+    reward values for different actions
+    try resetting exploration rate and decaying it every 100 games or something
+
+In Gui,
+    Abstract out code
+    Change if else chain to something more efficient
+    Split overindented code into methods
+
+In Environments
+    optimize oneActionReward
+    verify that trainMove works as intended
+
+In Player trainer, optimize code
 
 Demonstrate intelligent gameplay on 4x4 or 6x6
-
-Also allow user to train network based on the user's input
-    So when the user makes an action, that action should be used for the reward function,
-    which trains the network
-
-Add distance to other pieces as part of the reward
-    More reward for nearby pieces
-
-Allow network data outside TensorFlow to be saved, like learning rate and related
 
 """
 
 # normal imports
 from Checkers.Gui import *
 from Checkers.DuelModel import *
+from Checkers.PlayerTrainer import *
+
 
 # center pygame window
 os.environ['SDL_VIDEO_CENTERED'] = "1"
@@ -38,12 +45,12 @@ def setRates(model):
     """
     Utility for setting hyperparameters
     """
-    model.learnRate = 0.5
+    model.learnRate = 1
     model.explorationRate = 1.0
     model.discountRate = 0.9
 
-    model.learnDecay = 0.97  # 0.9991  # 0.97
-    model.explorationDecay = 0.975  # 0.998  # 0.975
+    model.learnDecay = 0.97
+    model.explorationDecay = 0.97
 
 
 def testCheckers():
@@ -52,22 +59,27 @@ def testCheckers():
     """
 
     # for loading in or not loading in the saved version of the Networks
-    loadModel = False
+    loadModel = True
     # number of games to play in training
     trainGames = 0
     # number of games to randomly pick moves and learn all at once
-    collectiveGames = 100
+    collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
     defaultGameModel = None
     # the size od the grid to play
-    gameSize = 8
+    gameSize = 4
+    # Side to use for the player trainer, use to manually train AI by playing games
+    #   True for AI plays red, False for AI plays Black
+    #   Set to None to turn off
+    #   When in use, AI will only play the specified side
+    playerTrainerSide = False
 
     # make game
     game = Game(gameSize)
 
     # create the model
-    env = DuelModel(game, rPieceInner=[200, 200, 200], rGameInner=[500, 500, 500],
-                    bPieceInner=[200, 200, 200], bGameInner=[500, 500, 500])
+    env = DuelModel(game, rPieceInner=[2] * 3, rGameInner=[2] * 3,
+                    bPieceInner=[2] * 3, bGameInner=[2] * 3)
     setRates(env.redEnv.internalNetwork)
     setRates(env.redEnv.gameNetwork)
     setRates(env.blackEnv.internalNetwork)
@@ -128,8 +140,14 @@ def testCheckers():
     # reset the game to the default state
     game.resetGame()
 
+    # create the player trainer
+    if playerTrainerSide is None:
+        trainer = None
+    else:
+        trainer = PlayerTrainer(env.blackEnv, playerTrainerSide)
+
     # set up and begin the gui
-    gui = Gui(env, printFPS=False, defaultGame=defaultGame)
+    gui = Gui(env, printFPS=False, defaultGame=defaultGame, playerTrainer=trainer)
     gui.loop()
 
 
@@ -203,10 +221,10 @@ def testDummyGame():
 
     if network:
         # make the network
-        net = Network(NUM_ACTIONS, env, inner=[],
+        net = Network(NUM_ACTIONS, env, inner=[10],
                       learnRate=0.1, explorationRate=0.1, discountRate=0.5)
         # train the network
-        for j in range(50):
+        for j in range(100):
             total = env.playGame(net, learn=True)
             print("Training: " + str(j) + ", " + str(env.x) + " " + str(env.y) + " " + str(total))
 

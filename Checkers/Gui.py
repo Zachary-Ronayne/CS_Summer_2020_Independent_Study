@@ -73,7 +73,7 @@ class Gui:
     A class that handles displaying and taking input for playing a Checkers Game in a GUI with pygame
     """
 
-    def __init__(self, qObject, fps=20, printFPS=False, defaultGame=None):
+    def __init__(self, qObject, fps=20, printFPS=False, defaultGame=None, playerTrainer=None):
         """
         Create and display the pygame Gui with the given game.
         Must call loop() to make the Gui stay open
@@ -83,10 +83,14 @@ class Gui:
         :param defaultGame: A custom Game with the pieces in the state where they should start,
             red still always moves first.
             Use None to have a normal game. Default None
+        :param playerTrainer: A PlayerTrainer object which will be used
+            for training the network by a user playing the game. None to not use this feature.
+            Default None.
         """
         self.qDuelModel = qObject
         self.game = qObject.game
         self.defaultGame = defaultGame
+        self.playerTrainer = playerTrainer
 
         # setup pygame
         pygame.init()
@@ -228,7 +232,20 @@ class Gui:
                                     s = self.game.oppositeGrid(s)
                                 # make the move the square it matches the one from the mouse
                                 if gPos == p:
-                                    self.game.play(s, bins)
+                                    # TODO get the position and modifiers from the action,
+                                    #   and send them to makeOpponentMove
+                                    #   Only do this if the playerTrainer is not None
+                                    # TODO if after this is called, it's the other player's turn, call train
+                                    # TODO should also move some of this code into separate methods
+                                    if self.playerTrainer is not None:
+                                        # TODO make this if statement less bloated
+                                        if not self.game.redTurn == self.playerTrainer.redSide:
+                                            self.playerTrainer.makeOpponentMove(s, bins)
+                                            self.game.play(s, bins)
+                                            if self.game.redTurn == self.playerTrainer.redSide:
+                                                self.playerTrainer.train()
+                                    else:
+                                        self.game.play(s, bins)
 
                 self.unselectSquare()
             # if there is a hovered square, select that square, and calculate the moves the square can use
@@ -242,13 +259,12 @@ class Gui:
         This method is run every time pygame detects a key on the keyboard has been released
         :param event: The pygame event object from the keypress
         """
+        # TODO change this to a dictionary or list lambda thing
         k = event.key
         if k == pygame.K_r:
-            self.game.resetGame()
-            self.unselectSquare()
+            self.resetGame()
         if k == pygame.K_e:
-            self.game.resetGame(self.defaultGame)
-            self.unselectSquare()
+            self.resetGame(self.defaultGame)
         elif k == pygame.K_ESCAPE:
             self.running = False
         elif k == pygame.K_a:
@@ -263,6 +279,16 @@ class Gui:
         elif k == pygame.K_s:
             self.saveNoteTimer = T_SAVE_TIME
             self.saveSuccess = self.qDuelModel.save("", DUEL_MODEL_NAME)
+
+    def resetGame(self, defaultGame=None):
+        """
+        Bring the game in the GUI to a default state.
+        :param defaultGame: A Checkers Game with the pieces in the desired starting state.
+        """
+        self.game.resetGame(defaultGame)
+        self.unselectSquare()
+        if self.playerTrainer is not None:
+            self.playerTrainer.reset()
 
     def makeQModelMove(self, train=False, explore=None):
         """
@@ -293,7 +319,16 @@ class Gui:
         if train:
             qEnv.trainMove()
         else:
-            qEnv.performAction(model)
+            if self.playerTrainer is None:
+                qEnv.performAction(model)
+            else:
+                # TODO abstract out this code
+                qEnv.gameEnv.performAction(qEnv.gameNetwork)
+                x, y = qEnv.current
+                gameAction = self.game.toSinglePos(x, y)
+                net = qEnv.toNetInput()
+                pieceAction = qEnv.selectAction(qEnv.internalNetwork, net)
+                self.playerTrainer.makeMove(pieceAction, gameAction)
 
         # reset the exploration rate
         qEnv.internalNetwork.explorationRate = oldExplorePiece

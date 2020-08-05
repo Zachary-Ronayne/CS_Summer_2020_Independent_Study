@@ -130,15 +130,6 @@ class PieceEnvironment(Environment):
         #   the only way to speed this up, would be to reduce the number of calls to networks
         #   or optimize how the networks are called
 
-        # TODO also need to make it possible for a player to train the network
-        #   The environment should make a move and remember the state and action for that move
-        #   Then when the player makes a move, that is the move used for determining the next
-        #   part of the reward function, determining the punishment.
-        #   Essentially, remember the reward for making the moves to make it the player's turn
-        #   then add the punishment received for the player making their moves
-        #   Once both values are determined, train the network with that state and action,
-        #   using the total reward and punishment
-
         # save the original game
         oldGame = self.game
         self.game = state
@@ -213,7 +204,7 @@ class PieceEnvironment(Environment):
         return s[x + y * self.game.width]
 
     def canTakeAction(self, action):
-        return self.game.canPlay(self.current, moveIntToBoolList(action), self.game.redTurn)
+        return action is not None and self.game.canPlay(self.current, moveIntToBoolList(action), self.game.redTurn)
 
     def takeAction(self, action):
         if action is None:
@@ -223,33 +214,60 @@ class PieceEnvironment(Environment):
         if c is not None:
             self.game.play(c, bins)
 
+    def selectAction(self, qModel=None, net=None):
+        """
+        Pick an action based on the given qModel and net input
+        :param qModel: The qModel used to make an action.
+            Or None to use the internal network, default None
+        :param net: The Network input used for the action.
+            Or none to use the current net input of this Environment, default None
+        :return: The action
+        """
+        return (self.internalNetwork if qModel is None else qModel).chooseAction(
+            self.toNetInput() if net is None else net, self.canTakeAction)
+
     def performAction(self, qModel):
         self.gameEnv.performAction(self.gameNetwork)
         net = self.toNetInput()
         if net is not None:
-            self.takeAction(qModel.chooseAction(net, self.canTakeAction))
+            self.takeAction(self.selectAction(qModel, net))
 
-    def trainMove(self):
+    def trainMove(self, pAction=None, gAction=None, pReward=None, gReward=None, newState=None):
         """
         Make a move in the game, and train the network based on that move
+        :param pAction: The piece action to take, or None to first pick a move. Default None
+        :param gAction: The game action to take, or None to first pick a space to move. Default None
+        :param pReward: The reward for taking the given piece action, or None if it must be determined. Default None
+        :param gReward: The reward for taking the given game action, or None if it must be determined. Default None
+        :param newState: The state to take the actions in, or None to use the game of this Environment. Default None
         :return The action taken by the PieceNetwork, None if no action can be taken
         """
-        state = self.currentState().makeCopy()
-        gameNetInput = self.gameEnv.toNetInput()
-        action = self.gameNetwork.chooseAction(gameNetInput, takeAction=self.gameEnv.canTakeAction)
-        if action is not None:
-            self.gameNetwork.train(state, action, self.gameEnv.canTakeAction)
-        else:
-            return None
+        # TODO should these makeCopy calls exist?
+        # TODO should the references to state in the train calls, call makeCopy?
+        # determine which state should be used for making the training move
+        state = self.currentState().makeCopy() if newState is None else newState.makeCopy()
 
-        self.gameEnv.performAction(self.gameNetwork)
+        # if no game action was given, select an action
+        if gAction is None:
+            gameNetInput = self.gameEnv.toNetInput()
+            gAction = self.gameNetwork.chooseAction(gameNetInput, takeAction=self.gameEnv.canTakeAction)
+
+        # if no game action could be found, return None, no action could be taken
+        if gAction is None:
+            return None
+        # if a game action was found, train based on that action, also take the action
+        else:
+            self.gameNetwork.trainReward(state, gAction, gReward, self.gameEnv.canTakeAction)
 
         netInput = self.toNetInput()
-        # do nothing if there is no valid input
+        # do nothing if there is no valid network
         if netInput is not None:
-            action = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
-            self.internalNetwork.train(state, action, takeAction=self.canTakeAction)
-            return action
+            # if a piece action was not given, select one
+            if pAction is None:
+                pAction = self.internalNetwork.chooseAction(netInput, takeAction=self.canTakeAction)
+            # train the piece action
+            self.internalNetwork.trainReward(state, pAction, pReward, takeAction=self.canTakeAction)
+            return pAction
         return None
 
     def playGame(self, printReward=False):
@@ -471,6 +489,18 @@ class GameEnvironment(Environment):
     def performAction(self, qModel):
         action = qModel.chooseAction(self.toNetInput(), self.canTakeAction)
         self.takeAction(action)
+
+    def selectAction(self, qModel=None, net=None):
+        """
+        Pick an action based on the given qModel and net input
+        :param qModel: The qModel used to make an action.
+            Or None to use the internal network, default None
+        :param net: The Network input used for the action.
+            Or none to use the current net input of this Environment, default None
+        :return: The action
+        """
+        return (self.pieceEnv.gameNetwork if qModel is None else qModel).chooseAction(
+            self.toNetInput() if net is None else net, self.canTakeAction)
 
     def takeAction(self, action):
         # convert the action into coordinates for a piece to move
