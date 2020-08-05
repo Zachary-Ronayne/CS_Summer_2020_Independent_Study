@@ -232,6 +232,22 @@ class PieceEnvironment(Environment):
         if net is not None:
             self.takeAction(self.selectAction(qModel, net))
 
+    def generateAction(self):
+        """
+        Pick an action for the to make in the current state, and return it.
+        :return: A 2-tuple of the actions, (piece action, game action)
+        """
+        # make a game action
+        self.gameEnv.performAction(self.gameNetwork)
+        # get the game action
+        x, y = self.current
+        gameAction = self.game.toSinglePos(x, y)
+        # make a piece action
+        net = self.toNetInput()
+        pieceAction = self.selectAction(self.internalNetwork, net)
+        # return the actions
+        return pieceAction, gameAction
+
     def trainMove(self, pAction=None, gAction=None, pReward=None, gReward=None, newState=None):
         """
         Make a move in the game, and train the network based on that move

@@ -10,11 +10,6 @@ Automate changing hyperparameters
     reward values for different actions
     try resetting exploration rate and decaying it every 100 games or something
 
-In Gui,
-    Abstract out code
-    Change if else chain to something more efficient
-    Split overindented code into methods
-
 In Environments
     optimize oneActionReward
     verify that trainMove works as intended

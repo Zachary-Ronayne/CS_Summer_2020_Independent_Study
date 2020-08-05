@@ -87,10 +87,23 @@ class Gui:
             for training the network by a user playing the game. None to not use this feature.
             Default None.
         """
+        # initialize objects
         self.qDuelModel = qObject
         self.game = qObject.game
         self.defaultGame = defaultGame
         self.playerTrainer = playerTrainer
+
+        # create dictionary for activating key presses
+        self.keyDict = {
+            pygame.K_r: lambda: self.resetGame(),
+            pygame.K_e: lambda: self.resetGame(self.defaultGame),
+            pygame.K_ESCAPE: lambda: self.stop(),
+            pygame.K_a: lambda: self.unselectSquare() if self.makeQModelMove() else None,
+            pygame.K_t: lambda: self.unselectSquare() if self.makeQModelMove(train=True) else None,
+            pygame.K_q: lambda: self.unselectSquare() if self.makeQModelMove(explore=0) else None,
+            pygame.K_s: lambda: self.saveGame(),
+            None: lambda: None
+        }
 
         # setup pygame
         pygame.init()
@@ -128,6 +141,12 @@ class Gui:
         # captureMoves should either be None, or a list of up to 4 elements
         #   each element is None, or a 2-tuple of the grid coordinates where a piece can be captured
         self.captureMoves = None
+
+    def stopLoop(self):
+        """
+        Stop running the game and close the window
+        """
+        self.running = False
 
     def loop(self):
         """
@@ -210,75 +229,76 @@ class Gui:
         # if the is a selected square, multiple things can happen
         else:
             # if the hover square is nothing, then unselect the square
-            # can only move to places where the hover square is not finding a piece
             if self.hoverSquare is None:
-                # select the move to play, based on the mouse location
+                # only move the piece if playMoves and selectedSquare exist
                 if self.playMoves is not None and self.selectedSquare is not None:
-                    # find the square in the grid, based on the mouse position
-                    mPos = pygame.mouse.get_pos()
-                    gPos = self.mouseToGrid(mPos[0], mPos[1])
-                    # if the square is on the grid, see if a move exists there
-                    if gPos is not None:
-                        # iterate through all possible moves
-                        for i, p in enumerate(self.playMoves):
-                            if p is not None:
-                                # determine the directions of moving
-                                bins = moveIntToBoolList(i)
-
-                                # if the turn is in the opposite direction from red's perspective,
-                                #   then the square must be reversed to get black's perspective
-                                s = self.selectedSquare
-                                if not self.game.redTurn:
-                                    s = self.game.oppositeGrid(s)
-                                # make the move the square it matches the one from the mouse
-                                if gPos == p:
-                                    # TODO get the position and modifiers from the action,
-                                    #   and send them to makeOpponentMove
-                                    #   Only do this if the playerTrainer is not None
-                                    # TODO if after this is called, it's the other player's turn, call train
-                                    # TODO should also move some of this code into separate methods
-                                    if self.playerTrainer is not None:
-                                        # TODO make this if statement less bloated
-                                        if not self.game.redTurn == self.playerTrainer.redSide:
-                                            self.playerTrainer.makeOpponentMove(s, bins)
-                                            self.game.play(s, bins)
-                                            if self.game.redTurn == self.playerTrainer.redSide:
-                                                self.playerTrainer.train()
-                                    else:
-                                        self.game.play(s, bins)
-
-                self.unselectSquare()
-            # if there is a hovered square, select that square, and calculate the moves the square can use
+                    self.handleMoveSelect()
+                    self.unselectSquare()
+            # otherwise, select that square, and calculate the moves the square can use
             else:
                 self.selectSquare()
                 if self.selectedSquare is not None:
                     self.calculateMoves(self.selectedSquare)
+
+    def handleMoveSelect(self):
+        """
+        Assume that self.playMoves and self.selectedSquare are valid.
+        Make a move in the game based on the position of the mouse by selecting a valid move.
+        """
+        mPos = pygame.mouse.get_pos()
+        gPos = self.mouseToGrid(mPos[0], mPos[1])
+        if gPos is not None:
+            self.handleGameMove(gPos)
+
+    def handleGameMove(self, gPos):
+        """
+        Assume that self.playMoves and self.selectedSquare are valid,
+        then make a move based on those squares
+        :param gPos: The position in the game to move
+        """
+        # iterate through all possible moves
+        for i, p in enumerate(self.playMoves):
+            if p is not None:
+                # determine the directions of moving
+                bins = moveIntToBoolList(i)
+
+                # if the turn is in the opposite direction from red's perspective,
+                #   then the square must be reversed to get black's perspective
+                s = self.selectedSquare
+                if not self.game.redTurn:
+                    s = self.game.oppositeGrid(s)
+                # make the move the square it matches the one from the mouse
+                if gPos == p:
+                    if self.playerTrainer is not None:
+                        self.handlePlayerTrainerMove(s, bins)
+                    else:
+                        self.game.play(s, bins)
+
+    def handlePlayerTrainerMove(self, s, modifiers):
+        """
+        Train and make a move with the player trainer.
+        :param s: The position of the piece to move
+        :param modifiers: The modifiers for the move, a 3-tuple (left, forward, jump)
+        """
+        if not self.game.redTurn == self.playerTrainer.redSide:
+            self.playerTrainer.makeOpponentMove(s, modifiers)
+            self.game.play(s, modifiers)
+            if self.game.redTurn == self.playerTrainer.redSide:
+                self.playerTrainer.train()
 
     def handleKeyUp(self, event):
         """
         This method is run every time pygame detects a key on the keyboard has been released
         :param event: The pygame event object from the keypress
         """
-        # TODO change this to a dictionary or list lambda thing
-        k = event.key
-        if k == pygame.K_r:
-            self.resetGame()
-        if k == pygame.K_e:
-            self.resetGame(self.defaultGame)
-        elif k == pygame.K_ESCAPE:
-            self.running = False
-        elif k == pygame.K_a:
-            if self.makeQModelMove():
-                self.unselectSquare()
-        elif k == pygame.K_t:
-            if self.makeQModelMove(train=True):
-                self.unselectSquare()
-        elif k == pygame.K_q:
-            if self.makeQModelMove(explore=0):
-                self.unselectSquare()
-        elif k == pygame.K_s:
-            self.saveNoteTimer = T_SAVE_TIME
-            self.saveSuccess = self.qDuelModel.save("", DUEL_MODEL_NAME)
+        self.keyDict[event.key]()
+
+    def saveGame(self):
+        """
+        Save the current state of the game to the default file
+        """
+        self.saveNoteTimer = T_SAVE_TIME
+        self.saveSuccess = self.qDuelModel.save("", DUEL_MODEL_NAME)
 
     def resetGame(self, defaultGame=None):
         """
@@ -322,12 +342,8 @@ class Gui:
             if self.playerTrainer is None:
                 qEnv.performAction(model)
             else:
-                # TODO abstract out this code
-                qEnv.gameEnv.performAction(qEnv.gameNetwork)
-                x, y = qEnv.current
-                gameAction = self.game.toSinglePos(x, y)
-                net = qEnv.toNetInput()
-                pieceAction = qEnv.selectAction(qEnv.internalNetwork, net)
+                # using the player trainer, determine which moves to make, and make them
+                pieceAction, gameAction = qEnv.generateAction()
                 self.playerTrainer.makeMove(pieceAction, gameAction)
 
         # reset the exploration rate
