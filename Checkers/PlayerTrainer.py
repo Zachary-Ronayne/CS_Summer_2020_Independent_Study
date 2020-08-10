@@ -84,7 +84,6 @@ class PlayerTrainer:
             )
             r = 0 if r is None else r
             # add that reward to all moves made by this PlayerTrainer
-            # TODO make this code more efficient
             for i, rew in enumerate(self.totalReward):
                 self.totalReward[i] = (rew[0] + 0 if r is None else r, rew[1])
 
@@ -98,8 +97,6 @@ class PlayerTrainer:
         if not self.game.redTurn == self.redSide or self.savedStates is None:
             return
 
-        # TODO make all of these training examples part of one larger array
-        #   so they can happen all at once with TensorFlow
         for a, s, r in zip(self.savedActions, self.savedStates, self.totalReward):
             # train both networks
             pieceA, gameA = a

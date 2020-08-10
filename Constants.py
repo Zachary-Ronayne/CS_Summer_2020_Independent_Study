@@ -70,13 +70,13 @@ Q_PIECE_REWARD_MOVE = .0001
 # reward when an enemy piece moves
 Q_PIECE_REWARD_ENEMY_MOVE = -.0001
 # reward when a normal enemy piece is captured
-Q_PIECE_REWARD_N_CAPTURE = .2
+Q_PIECE_REWARD_N_CAPTURE = .05
 # reward when a king enemy piece is captured
-Q_PIECE_REWARD_K_CAPTURE = .2
+Q_PIECE_REWARD_K_CAPTURE = .05
 # reward when a normal ally piece is captured
-Q_PIECE_REWARD_N_CAPTURED = -.4
+Q_PIECE_REWARD_N_CAPTURED = -.1
 # reward when a king ally piece is captured
-Q_PIECE_REWARD_K_CAPTURED = -.45
+Q_PIECE_REWARD_K_CAPTURED = -.12
 # reward when an ally piece becomes a king
 Q_PIECE_REWARD_KING = .005
 # reward when an enemy piece becomes a king
@@ -84,7 +84,7 @@ Q_PIECE_REWARD_KINGED = -.002
 # reward for winning the game
 Q_PIECE_REWARD_WIN = .2
 # reward for losing the game
-Q_PIECE_REWARD_LOSE = -.1
+Q_PIECE_REWARD_LOSE = -1
 # reward for drawing the game
 Q_PIECE_REWARD_DRAW = -.1
 # reward for the game being still in progress

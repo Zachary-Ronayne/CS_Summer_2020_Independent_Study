@@ -43,6 +43,7 @@ class PieceEnvironment(Environment):
         if Q_USE_CONVOLUTIONAL_LAYERS:
             self.gameNetwork = ConvNetwork(self.game.area(), self.gameEnv, self.game, Q_GAME_NUM_GRIDS,
                                            inner=[] if gameInner is None else gameInner)
+
             self.internalNetwork = ConvNetwork(Q_PIECE_NUM_ACTIONS, self, self.game, Q_PIECE_NUM_GRIDS,
                                                inner=[] if pieceInner is None else pieceInner)
         else:
@@ -62,6 +63,7 @@ class PieceEnvironment(Environment):
     def toNetInput(self):
         if self.current is None:
             return None
+
         return gameToNetInput(self.game, self.current)
 
     def currentState(self):
@@ -258,10 +260,8 @@ class PieceEnvironment(Environment):
         :param newState: The state to take the actions in, or None to use the game of this Environment. Default None
         :return The action taken by the PieceNetwork, None if no action can be taken
         """
-        # TODO should these makeCopy calls exist?
-        # TODO should the references to state in the train calls, call makeCopy?
         # determine which state should be used for making the training move
-        state = self.currentState().makeCopy() if newState is None else newState.makeCopy()
+        state = self.currentState() if newState is None else newState
 
         # if no game action was given, select an action
         if gAction is None:
@@ -543,6 +543,7 @@ def gameToNetInput(g, current):
             for i, s in enumerate(r):
                 if s is not None:
                     states[0][j][i][netInputIndex(s, current, i, j)] = 1
+
         return states
     else:
         # get the state of the environment
@@ -557,6 +558,7 @@ def gameToNetInput(g, current):
             x, y = g.singlePos(i)
             if s is not None:
                 states[0][netInputIndex(s, current, x, y) * size + y * g.width + x] = 1
+
         return states
 
 

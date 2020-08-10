@@ -204,7 +204,8 @@ class Network(QModel):
     A Q learning model that learns based on a feed forward neural network
     """
 
-    def __init__(self, actions, environment, inner=None, learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+    def __init__(self, actions, environment, inner=None,
+                 learnRate=0.5, discountRate=0.5, explorationRate=0.5):
         """
         Create a Network for Q learning for training a model
         :param actions: The number of actions
@@ -216,7 +217,8 @@ class Network(QModel):
         :param discountRate: The discount rate of the Network
         :param explorationRate: The probability that a random action will be taken, rather than the optimal one
         """
-        super().__init__(environment.networkInputs(), actions, environment, learnRate, discountRate, explorationRate)
+        super().__init__(environment.networkInputs(), actions, environment,
+                         learnRate, discountRate, explorationRate)
 
         if inner is None:
             inner = []

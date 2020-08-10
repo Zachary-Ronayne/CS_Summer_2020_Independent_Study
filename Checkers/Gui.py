@@ -291,7 +291,9 @@ class Gui:
         This method is run every time pygame detects a key on the keyboard has been released
         :param event: The pygame event object from the keypress
         """
-        self.keyDict[event.key]()
+        k = event.key
+        if k in self.keyDict:
+            self.keyDict[k]()
 
     def saveGame(self):
         """
@@ -566,10 +568,8 @@ class Gui:
     def stop(self):
         """
         End the pygame window thread
-        :return:
         """
         self.running = False
-        pygame.quit()
 
 
 def gridToMouse(c, r):

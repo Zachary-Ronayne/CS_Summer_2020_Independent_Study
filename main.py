@@ -3,18 +3,8 @@
 
 TODO:
 
-In QLearn, test out the dummy model with a non convolutional network
-    it doesn't seem to predict anything correctly
-
-Automate changing hyperparameters
-    reward values for different actions
-    try resetting exploration rate and decaying it every 100 games or something
-
 In Environments
     optimize oneActionReward
-    verify that trainMove works as intended
-
-In Player trainer, optimize code
 
 Demonstrate intelligent gameplay on 4x4 or 6x6
 
@@ -40,12 +30,26 @@ def setRates(model):
     """
     Utility for setting hyperparameters
     """
-    model.learnRate = 1
+    model.learnRate = 0.1
     model.explorationRate = 1.0
     model.discountRate = 0.9
 
-    model.learnDecay = 0.97
-    model.explorationDecay = 0.97
+    model.learnDecay = 0.98
+    model.explorationDecay = 0.98
+
+
+def resetRates(env):
+    """
+    Utility for changing hyperparameters at a regular interval
+    """
+    setRates(env.redEnv.internalNetwork)
+    setRates(env.redEnv.gameNetwork)
+    setRates(env.blackEnv.internalNetwork)
+    setRates(env.blackEnv.gameNetwork)
+    env.blackEnv.internalNetwork.explorationDecay = 1
+    env.blackEnv.internalNetwork.learnDecay = 1
+    env.blackEnv.gameNetwork.explorationDecay = 1
+    env.blackEnv.gameNetwork.learnDecay = 1
 
 
 def testCheckers():
@@ -54,9 +58,9 @@ def testCheckers():
     """
 
     # for loading in or not loading in the saved version of the Networks
-    loadModel = True
+    loadModel = False
     # number of games to play in training
-    trainGames = 0
+    trainGames = 1
     # number of games to randomly pick moves and learn all at once
     collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
@@ -67,18 +71,17 @@ def testCheckers():
     #   True for AI plays red, False for AI plays Black
     #   Set to None to turn off
     #   When in use, AI will only play the specified side
-    playerTrainerSide = False
+    playerTrainerSide = True
+    # reset the rates for learning and exploration every this number of games
+    resetRatesInterval = 200
 
     # make game
     game = Game(gameSize)
 
     # create the model
-    env = DuelModel(game, rPieceInner=[2] * 3, rGameInner=[2] * 3,
-                    bPieceInner=[2] * 3, bGameInner=[2] * 3)
-    setRates(env.redEnv.internalNetwork)
-    setRates(env.redEnv.gameNetwork)
-    setRates(env.blackEnv.internalNetwork)
-    setRates(env.blackEnv.gameNetwork)
+    env = DuelModel(game, rPieceInner=[20] * 3, rGameInner=[30] * 3,
+                    bPieceInner=[20] * 3, bGameInner=[30] * 3)
+    resetRates(env)
 
     # load in the model if applicable
     if loadModel:
@@ -127,7 +130,10 @@ def testCheckers():
         print("Current explore rate:", env.redEnv.internalNetwork.explorationRate)
         print("Current discount rate:", env.redEnv.internalNetwork.discountRate)
         print()
-        env.decayModels()
+        if i % resetRatesInterval == resetRatesInterval - 1:
+            resetRates(env)
+        else:
+            env.decayModels()
 
     # train games where random moves are taken
     env.trainCollective(collectiveGames, printGames=True)
