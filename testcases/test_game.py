@@ -789,6 +789,17 @@ class TestGame(TestCase):
         self.assertEqual(moveIntToBoolList(6), (True, True, False))
         self.assertEqual(moveIntToBoolList(7), (True, True, True))
 
+    def test_boolListToInt(self):
+        # verify each number
+        self.assertEqual(boolListToInt((False, False, False)), 0)
+        self.assertEqual(boolListToInt((False, False, True)), 1)
+        self.assertEqual(boolListToInt((False, True, False)), 2)
+        self.assertEqual(boolListToInt((False, True, True)), 3)
+        self.assertEqual(boolListToInt((True, False, False)), 4)
+        self.assertEqual(boolListToInt((True, False, True)), 5)
+        self.assertEqual(boolListToInt((True, True, False)), 6)
+        self.assertEqual(boolListToInt((True, True, True)), 7)
+
     def test_addDiagMoves(self):
         # check all moves on right diagonal
         moves = []

@@ -50,7 +50,7 @@ class QModel:
         """
         Apply decay to the learning rate, exploration rate, and discount rate
         """
-        self.learnRate *= self.learnDecay
+        self.updateLearningRate(self.learnRate * self.learnDecay)
         self.discountRate *= self.discountDecay
         self.explorationRate *= self.explorationDecay
 

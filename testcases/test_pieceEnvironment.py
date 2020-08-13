@@ -61,52 +61,52 @@ class TestPieceEnvironment(TestCase):
         game.clearBoard()
         game.redTurn = True
         game.spot(0, 3, (True, False), True)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, False]), Q_PIECE_REWARD_MOVE)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, False], True), Q_PIECE_REWARD_MOVE)
 
         # test enemy moving normally
         game.clearBoard()
         game.redTurn = False
         game.spot(0, 3, (False, False), False)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, False]), Q_PIECE_REWARD_ENEMY_MOVE)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, False], True), Q_PIECE_REWARD_ENEMY_MOVE)
 
         # test ally capturing normal piece, then king
         game.clearBoard()
         game.redTurn = True
         game.spot(0, 3, (True, False), True)
         game.spot(0, 2, (False, False), True)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, True]), Q_PIECE_REWARD_N_CAPTURE)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, True], True), Q_PIECE_REWARD_N_CAPTURE)
 
         game.spot(0, 2, (False, True), True)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, True]), Q_PIECE_REWARD_K_CAPTURE)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, True], True), Q_PIECE_REWARD_K_CAPTURE)
 
         # test enemy capturing normal piece, then king
         game.clearBoard()
         game.redTurn = False
         game.spot(0, 3, (False, False), False)
         game.spot(0, 2, (True, False), False)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, True]), Q_PIECE_REWARD_N_CAPTURED)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, True], True), Q_PIECE_REWARD_N_CAPTURED)
 
         game.spot(0, 2, (True, True), False)
-        self.assertEqual(moveReward(game, (0, 3), [False, True, True]), Q_PIECE_REWARD_K_CAPTURED)
+        self.assertEqual(moveReward(game, (0, 3), [False, True, True], True), Q_PIECE_REWARD_K_CAPTURED)
 
         # test reward for ally getting a king, then test that if they are already a king, they don't get extra reward
         game.clearBoard()
         game.redTurn = True
         game.spot(0, 1, (True, False), True)
-        self.assertEqual(moveReward(game, (0, 1), [False, True, False]), Q_PIECE_REWARD_KING + Q_PIECE_REWARD_MOVE)
+        self.assertEqual(moveReward(game, (0, 1), [False, True, False], True), Q_PIECE_REWARD_KING + Q_PIECE_REWARD_MOVE)
 
         game.spot(0, 1, (True, True), True)
-        self.assertEqual(moveReward(game, (0, 1), [False, True, False]), Q_PIECE_REWARD_MOVE)
+        self.assertEqual(moveReward(game, (0, 1), [False, True, False], True), Q_PIECE_REWARD_MOVE)
 
         # test reward for enemy getting a king, then test that if they are already a king, they don't get extra reward
         game.clearBoard()
         game.redTurn = False
-        game.spot(0, 1, (False, False), False)
-        self.assertEqual(moveReward(game, (0, 1), [False, True, False]),
+        game.spot(0, 1, (True, False), False)
+        self.assertEqual(moveReward(game, (0, 1), [False, True, False], True),
                          Q_PIECE_REWARD_KINGED + Q_PIECE_REWARD_ENEMY_MOVE)
 
-        game.spot(0, 1, (False, True), False)
-        self.assertEqual(moveReward(game, (0, 1), [False, True, False]), Q_PIECE_REWARD_ENEMY_MOVE)
+        game.spot(0, 1, (True, True), False)
+        self.assertEqual(moveReward(game, (0, 1), [False, True, False], True), Q_PIECE_REWARD_ENEMY_MOVE)
 
     def test_endGameReward(self):
         # create a Game

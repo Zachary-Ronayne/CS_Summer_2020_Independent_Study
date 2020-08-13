@@ -283,7 +283,10 @@ class Gui:
         if not self.game.redTurn == self.playerTrainer.redSide:
             self.playerTrainer.makeOpponentMove(s, modifiers)
             self.game.play(s, modifiers)
-            if self.game.redTurn == self.playerTrainer.redSide:
+            over = not (self.game.win == E_PLAYING)
+            if self.game.redTurn == self.playerTrainer.redSide or over:
+                if over:
+                    self.game.redTurn = not self.game.redTurn
                 self.playerTrainer.train()
 
     def handleKeyUp(self, event):
@@ -320,6 +323,10 @@ class Gui:
         :return True if a move was successfully made, False otherwise
         """
 
+        # if the game is over, don't make a move
+        if not self.game.win == E_PLAYING:
+            return
+
         # get the appropriate environment
         qEnv = self.qDuelModel.currentEnvironment()
 
@@ -346,7 +353,11 @@ class Gui:
             else:
                 # using the player trainer, determine which moves to make, and make them
                 pieceAction, gameAction = qEnv.generateAction()
+
                 self.playerTrainer.makeMove(pieceAction, gameAction)
+
+                if not self.game.win == E_PLAYING:
+                    self.playerTrainer.train()
 
         # reset the exploration rate
         qEnv.internalNetwork.explorationRate = oldExplorePiece

@@ -3,10 +3,10 @@
 
 TODO:
 
+Demonstrate intelligent gameplay on 4x4 or 6x6
+
 In Environments
     optimize oneActionReward
-
-Demonstrate intelligent gameplay on 4x4 or 6x6
 
 """
 
@@ -30,12 +30,12 @@ def setRates(model):
     """
     Utility for setting hyperparameters
     """
-    model.learnRate = 0.1
+    model.updateLearningRate(0.001)
     model.explorationRate = 1.0
-    model.discountRate = 0.9
+    model.discountRate = 0.6
 
-    model.learnDecay = 0.98
-    model.explorationDecay = 0.98
+    model.learnDecay = 0.997
+    model.explorationDecay = 0.998
 
 
 def resetRates(env):
@@ -46,10 +46,6 @@ def resetRates(env):
     setRates(env.redEnv.gameNetwork)
     setRates(env.blackEnv.internalNetwork)
     setRates(env.blackEnv.gameNetwork)
-    env.blackEnv.internalNetwork.explorationDecay = 1
-    env.blackEnv.internalNetwork.learnDecay = 1
-    env.blackEnv.gameNetwork.explorationDecay = 1
-    env.blackEnv.gameNetwork.learnDecay = 1
 
 
 def testCheckers():
@@ -60,27 +56,27 @@ def testCheckers():
     # for loading in or not loading in the saved version of the Networks
     loadModel = False
     # number of games to play in training
-    trainGames = 1
+    trainGames = 1200
     # number of games to randomly pick moves and learn all at once
     collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
-    defaultGameModel = None
+    defaultGameModel = 3
     # the size od the grid to play
     gameSize = 4
     # Side to use for the player trainer, use to manually train AI by playing games
     #   True for AI plays red, False for AI plays Black
     #   Set to None to turn off
     #   When in use, AI will only play the specified side
-    playerTrainerSide = True
+    playerTrainerSide = False
     # reset the rates for learning and exploration every this number of games
-    resetRatesInterval = 200
+    resetRatesInterval = 300
 
     # make game
     game = Game(gameSize)
 
     # create the model
-    env = DuelModel(game, rPieceInner=[20] * 3, rGameInner=[30] * 3,
-                    bPieceInner=[20] * 3, bGameInner=[30] * 3)
+    env = DuelModel(game, rPieceInner=[3] * 3, rGameInner=[7] * 3,
+                    bPieceInner=[3] * 3, bGameInner=[7] * 3)
     resetRates(env)
 
     # load in the model if applicable
@@ -145,7 +141,7 @@ def testCheckers():
     if playerTrainerSide is None:
         trainer = None
     else:
-        trainer = PlayerTrainer(env.blackEnv, playerTrainerSide)
+        trainer = PlayerTrainer(env.redEnv if playerTrainerSide else env.blackEnv, playerTrainerSide)
 
     # set up and begin the gui
     gui = Gui(env, printFPS=False, defaultGame=defaultGame, playerTrainer=trainer)

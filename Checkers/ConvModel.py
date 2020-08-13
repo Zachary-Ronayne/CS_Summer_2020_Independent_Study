@@ -44,7 +44,7 @@ class ConvNetwork(Network):
 
     def getActions(self, s):
         # get the actions
-        actions = self.net.predict(s, verbose=0)
+        actions = self.net(s)
         # convert the actions to a list
         return actions[0][0][0]
 

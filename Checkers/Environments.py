@@ -163,13 +163,16 @@ class PieceEnvironment(Environment):
 
         piecePos = self.current
 
-        # if no action can be taken, then the game must be over, so do not take another move
-        if action is not None:
+        # if a move cannot be made, ensure win conditions are checked
+        if action is None:
+            self.game.checkWinConditions()
+        # if an action can be taken, then the game is not over, so make a move
+        else:
             # find the modifiers for the action
             modifiers = moveIntToBoolList(action)
 
             # add the reward for the piece moving
-            moveR = moveReward(self.game, piecePos, modifiers)
+            moveR = moveReward(self.game, piecePos, modifiers, redTurn)
             if moveR is not None:
                 totalReward += moveR
                 # make the move
@@ -182,9 +185,6 @@ class PieceEnvironment(Environment):
             else:
                 # if no move reward was found, then there was no valid reward, so set the reward to None
                 totalReward = None
-        # if a move cannot be made, ensure win conditions are checked
-        else:
-            self.game.checkWinConditions()
 
         # put the game back to it's original state
         self.game = oldGame
@@ -379,12 +379,14 @@ class PieceEnvironment(Environment):
             return False
 
 
-def moveReward(state, position, modifiers):
+def moveReward(state, position, modifiers, redTurn):
     """
     Helper method for rewardFunc. Determines the amount of reward when a piece moves
     :param state: The current state of the game
-    :param position: The position of the piece to move
+    :param position: The position of the piece to move,
+        this is always from the perspective of the current turn
     :param modifiers: The modifiers defining how the piece moves
+    :param redTurn: True if the reward should be relative to red side, False for black side
     :return: The total reward gained from moving, None if no valid pieces were given
     """
 
@@ -396,26 +398,26 @@ def moveReward(state, position, modifiers):
     # if there is no valid piece to move, then return no reward
     if selectPos is None:
         return None
-    else:
-        ally, king = selectPos
+
+    ally, king = selectPos
 
     # if it's a jump, add capture reward for appropriate piece
     if modifiers[2]:
         capturedPos = movePos(position, (modifiers[0], modifiers[1], False))
         x, y = capturedPos
         captured = state.gridPos(x, y, state.redTurn)
-        if ally:
+        if state.redTurn == redTurn:
             reward += Q_PIECE_REWARD_K_CAPTURE if captured[1] else Q_PIECE_REWARD_N_CAPTURE
         else:
             reward += Q_PIECE_REWARD_K_CAPTURED if captured[1] else Q_PIECE_REWARD_N_CAPTURED
 
     # add movement reward if it is an ally piece
     else:
-        reward += Q_PIECE_REWARD_MOVE if ally else Q_PIECE_REWARD_ENEMY_MOVE
+        reward += Q_PIECE_REWARD_MOVE if state.redTurn == redTurn else Q_PIECE_REWARD_ENEMY_MOVE
 
     # add reward if the piece is kinged, meaning the piece is currently not a king, and it reaches the end
     if not king and newPos[1] == 0:
-        reward += Q_PIECE_REWARD_KING if ally else Q_PIECE_REWARD_KINGED
+        reward += Q_PIECE_REWARD_KING if state.redTurn == redTurn else Q_PIECE_REWARD_KINGED
 
     return reward
 

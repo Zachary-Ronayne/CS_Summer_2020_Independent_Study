@@ -42,6 +42,7 @@ class PlayerTrainer:
         self.savedActions = []
         self.savedStates = []
         self.totalReward = []
+
         # continue to get reward until it is the opponent's turn, or the game ends
         while self.game.redTurn == self.redSide and self.game.win == E_PLAYING:
             # if the actions are none, then pick new ones
@@ -55,11 +56,13 @@ class PlayerTrainer:
             self.savedActions.append((pieceAction, gameAction))
             # set the piece which will be selected
             self.environment.current = self.game.singlePos(gameAction)
+
             # add the reward for making that one move
             self.totalReward.append(
                 (self.environment.oneActionReward(self.game.makeCopy(), pieceAction, self.redSide),
                  self.environment.gameEnv.rewardFunc(self.game, gameAction))
             )
+
             # make that move in the game
             self.environment.takeAction(pieceAction)
 
@@ -80,9 +83,9 @@ class PlayerTrainer:
             self.environment.current = pos
             # add the reward for that move being made
             r = self.environment.oneActionReward(
-                self.game.makeCopy(), boolListToInt(modifiers), self.game.redTurn
+                self.game.makeCopy(), boolListToInt(modifiers), not self.game.redTurn
             )
-            r = 0 if r is None else r
+
             # add that reward to all moves made by this PlayerTrainer
             for i, rew in enumerate(self.totalReward):
                 self.totalReward[i] = (rew[0] + 0 if r is None else r, rew[1])
