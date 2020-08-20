@@ -50,7 +50,7 @@ class QModel:
         """
         Apply decay to the learning rate, exploration rate, and discount rate
         """
-        self.updateLearningRate(self.learnRate * self.learnDecay)
+        self.learnRate *= self.learnDecay
         self.discountRate *= self.discountDecay
         self.explorationRate *= self.explorationDecay
 
@@ -125,13 +125,6 @@ class QModel:
         """
 
     @abc.abstractmethod
-    def updateLearningRate(self, newRate):
-        """
-        Update the learning rate of this QModel, this should also update any other objects that use a learning rate
-        :param newRate: The new learning rate
-        """
-
-    @abc.abstractmethod
     def usesNetwork(self):
         """
         Determine if this QModel uses a Network input to choose an action
@@ -192,9 +185,6 @@ class Table(QModel):
     def getActions(self, s):
         return [self.qTable[s, i] for i in range(self.actions)]
 
-    def updateLearningRate(self, newRate):
-        self.learnRate = newRate
-
     def usesNetwork(self):
         return False
 
@@ -205,7 +195,8 @@ class Network(QModel):
     """
 
     def __init__(self, actions, environment, inner=None,
-                 learnRate=0.5, discountRate=0.5, explorationRate=0.5):
+                 learnRate=0.5, discountRate=0.5, explorationRate=0.5,
+                 optimizerRate=0.001, optimizerRateDecay=1):
         """
         Create a Network for Q learning for training a model
         :param actions: The number of actions
@@ -216,6 +207,7 @@ class Network(QModel):
         :param learnRate: The learning rate of the Network
         :param discountRate: The discount rate of the Network
         :param explorationRate: The probability that a random action will be taken, rather than the optimal one
+        :param optimizerRate: The learning rate for the optimizer
         """
         super().__init__(environment.networkInputs(), actions, environment,
                          learnRate, discountRate, explorationRate)
@@ -226,9 +218,16 @@ class Network(QModel):
 
         self.net = None
         self.optimizer = None
-        self.updateLearningRate(learnRate)
+
+        self.optimizerRate = optimizerRate
+        self.optimizerRateDecay = optimizerRateDecay
+        self.updateOptimizerRate(optimizerRate)
 
         self.initNetwork()
+
+    def decayRates(self):
+        super().decayRates()
+        self.updateOptimizerRate(self.optimizerRate * self.optimizerRateDecay)
 
     def initNetwork(self):
         """
@@ -343,9 +342,9 @@ class Network(QModel):
         # convert the actions to a list
         return [a for a in actions[0]]
 
-    def updateLearningRate(self, newRate):
-        self.learnRate = newRate
-        self.optimizer = OPTIMIZE_FUNCTION(learning_rate=self.learnRate)
+    def updateOptimizerRate(self, newRate):
+        self.optimizerRate = newRate
+        self.optimizer = OPTIMIZE_FUNCTION(learning_rate=self.optimizerRate)
 
     def usesNetwork(self):
         return True

@@ -66,17 +66,17 @@ Q_REWARD_INVALID_ACTION = -.1
 Q_GAME_REWARD_NO_ACTIONS = -.1
 
 # reward when an ally piece moves
-Q_PIECE_REWARD_MOVE = .0001
+Q_PIECE_REWARD_MOVE = .0004
 # reward when an enemy piece moves
-Q_PIECE_REWARD_ENEMY_MOVE = -.0002
+Q_PIECE_REWARD_ENEMY_MOVE = -.0008
 # reward when a normal enemy piece is captured
-Q_PIECE_REWARD_N_CAPTURE = .05
+Q_PIECE_REWARD_N_CAPTURE = 0.2
 # reward when a king enemy piece is captured
-Q_PIECE_REWARD_K_CAPTURE = .05
+Q_PIECE_REWARD_K_CAPTURE = 0.25
 # reward when a normal ally piece is captured
-Q_PIECE_REWARD_N_CAPTURED = -.04
-# reward when a king ally piece is captured
-Q_PIECE_REWARD_K_CAPTURED = -.042
+Q_PIECE_REWARD_N_CAPTURED = -.45
+# # reward when a king ally piece is captured
+Q_PIECE_REWARD_K_CAPTURED = -.49
 # reward when an ally piece becomes a king
 Q_PIECE_REWARD_KING = .01
 # reward when an enemy piece becomes a king
@@ -86,11 +86,11 @@ Q_PIECE_REWARD_WIN = .4
 # reward for losing the game
 Q_PIECE_REWARD_LOSE = -.4
 # reward for drawing the game
-Q_PIECE_REWARD_DRAW = -.1
+Q_PIECE_REWARD_DRAW = -1
 # reward for the game being still in progress
 Q_PIECE_REWARD_PLAYING = 0
 # this value is multiplied by the total number of moves, and added to the reward when the game ends
-Q_PIECE_REWARD_MOVES_FACTOR = 0.001
+Q_PIECE_REWARD_MOVES_FACTOR = -0.003
 
 # True to use convolutional layers for all neural networks with the Checkers Game Environments
 #   False to use feed forward networks

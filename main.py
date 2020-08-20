@@ -30,12 +30,14 @@ def setRates(model):
     """
     Utility for setting hyperparameters
     """
-    model.updateLearningRate(0.001)
-    model.explorationRate = 1.0
-    model.discountRate = 0.6
+    model.learnRate = 0.000001
+    model.explorationRate = 0.2
+    model.discountRate = 0.8
+    model.updateOptimizerRate(0.0000001)
 
-    model.learnDecay = 0.997
-    model.explorationDecay = 0.998
+    model.learnDecay = 0.96
+    model.explorationDecay = 0.97
+    model.optimizerRateDecay = 0.96
 
 
 def resetRates(env):
@@ -54,29 +56,29 @@ def testCheckers():
     """
 
     # for loading in or not loading in the saved version of the Networks
-    loadModel = False
+    loadModel = True
     # number of games to play in training
-    trainGames = 1200
+    trainGames = 400
     # number of games to randomly pick moves and learn all at once
     collectiveGames = 0
     # number for the default game to play, use None to just play a normal game
-    defaultGameModel = 3
+    defaultGameModel = None
     # the size od the grid to play
-    gameSize = 4
+    gameSize = 6
     # Side to use for the player trainer, use to manually train AI by playing games
     #   True for AI plays red, False for AI plays Black
     #   Set to None to turn off
     #   When in use, AI will only play the specified side
     playerTrainerSide = False
     # reset the rates for learning and exploration every this number of games
-    resetRatesInterval = 300
+    resetRatesInterval = 100
 
     # make game
     game = Game(gameSize)
 
     # create the model
-    env = DuelModel(game, rPieceInner=[3] * 3, rGameInner=[7] * 3,
-                    bPieceInner=[3] * 3, bGameInner=[7] * 3)
+    env = DuelModel(game, rPieceInner=[30] * 3, rGameInner=[60] * 3,
+                    bPieceInner=[30] * 3, bGameInner=[60] * 3)
     resetRates(env)
 
     # load in the model if applicable
